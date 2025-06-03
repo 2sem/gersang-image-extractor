@@ -127,8 +127,8 @@
                         }
                     } else if (compressionType === 'skipOnly') {
                         const alpha = type;
-                        const red = dataView.getUint8(start + i * 4 + 2);
-                        const green = dataView.getUint8(start + i * 4 + 3);
+                        const red = dataView.getUint8(start + i * 4 + 1);
+                        const green = dataView.getUint8(start + i * 4 + 2);
                         const blue = dataView.getUint8(start + i * 4 + 3);
                         paintedPixelCommands++;
                         totalPaintedPixels++;
