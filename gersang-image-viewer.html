@@ -1,0 +1,201 @@
+<!-- Created by Copilot with ChatGPT-4 -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>거상 이미지 Viewer</title>
+    <style>
+        /* ...existing code... */
+        .image-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .image-item {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: center;
+        }
+        .image-item img {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>거상 이미지 Viewer</h1>
+    <input type="file" id="fileInput" accept=".s32">
+    <button id="exportSelected">선택한 이미지 내보내기</button>
+    <button id="exportAll">전체 내보내기</button>
+    <div class="image-container" id="imageContainer"></div>
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const imageContainer = document.getElementById('imageContainer');
+        const exportSelectedButton = document.getElementById('exportSelected');
+        const exportAllButton = document.getElementById('exportAll');
+
+        fileInput.addEventListener('change', handleFileSelect);
+        exportSelectedButton.addEventListener('click', exportSelectedImages);
+        exportAllButton.addEventListener('click', exportAllImages);
+
+        const compressionTypeSelect = document.createElement('select');
+        compressionTypeSelect.id = 'compressionTypeSelect';
+        compressionTypeSelect.innerHTML = `
+            <option value="compressed">압축</option>
+            <option value="skipOnly">건너띄기만 압축</option>
+        `;
+        document.body.insertBefore(compressionTypeSelect, document.getElementById('fileInput'));
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const arrayBuffer = e.target.result;
+                parseS32File(arrayBuffer);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function parseS32File(buffer) {
+            const dataView = new DataView(buffer);
+            console.log("[Log] 파일 종류:", dataView.getUint32(0, true));
+            console.log("[Log] 이미지 넓이:", dataView.getUint32(4, true));
+            console.log("[Log] 이미지 높이:", dataView.getUint32(8, true));
+            const imageCount = dataView.getUint32(12, true);
+            console.log("[Log] 압축된 이미지 수:", imageCount);
+
+            const width = dataView.getUint32(4, true);
+            const height = dataView.getUint32(8, true);
+
+            const startPositions = [];
+            const compressedPixelCounts = [];
+            for (let i = 0; i < imageCount; i++) {
+                startPositions.push(dataView.getUint32(1216 + i * 4, true) + 3660);
+                compressedPixelCounts.push(dataView.getUint32(2416 + i * 4, true));
+            }
+
+            for (let i = 0; i < imageCount; i++) {
+                const imageStart = startPositions[i];
+                const compressedPixelCount = compressedPixelCounts[i];
+                console.log(`[Log] ${i + 1}번째 이미지 시작 위치: ${imageStart}`);
+                console.log(`[Log] ${i + 1}번째 이미지 압축된 픽셀 수: ${compressedPixelCount}`);
+
+                console.log(`[Log] ${i + 1}번째 이미지 추출 시작`);
+                const decompressedPixels = decompressPixels(dataView, imageStart, compressedPixelCount, width, height);
+                console.log(`[Log] ${i + 1}번째 이미지 압축 해제된 픽셀 수: ${decompressedPixels.length / 4}`);
+                const imageData = createImageData(decompressedPixels, width, height);
+                console.log(`[Log] ${i + 1}번째 이미지 추출 완료`);
+                addImageToContainer(i + 1, imageData);
+            }
+
+            console.log(`[Log] S32 파일에서 이미지 추출 완료, 추출된 이미지 개수: ${imageCount}`);
+        }
+
+        function decompressPixels(dataView, start, count, width, height) {
+            const compressionType = document.getElementById('compressionTypeSelect').value;
+            const pixels = new Uint8ClampedArray(width * height * 4);
+            let pixelIndex = 0;
+            let paintedPixelCommands = 0; // 압축된 칠하는 명령 수
+            let skippedPixelCommands = 0; // 압축된 건너뛰는 명령 수
+            let totalPaintedPixels = 0; // 칠한 픽셀의 총 횟수
+            let totalSkippedPixels = 0; // 건너뛴 픽셀의 총 횟수
+
+            for (let i = 0; i < count; i++) {
+                const type = dataView.getUint8(start + i * 4);
+                const hexValue = Array.from({ length: 4 }, (_, j) => 
+                    dataView.getUint8(start + i * 4 + j).toString(16).padStart(2, '0')
+                ).join(' ');
+                console.log(`[Log] ${i + 1}번째 픽셀 Hex: ${hexValue}`);
+
+                if (type > 0) {
+                    if (compressionType === 'compressed') {
+                        const repeat = type === 0xFF ? 1 : type;
+                        const red = dataView.getUint8(start + i * 4 + 1);
+                        const green = dataView.getUint8(start + i * 4 + 2);
+                        const blue = dataView.getUint8(start + i * 4 + 3);
+                        paintedPixelCommands++;
+                        totalPaintedPixels += repeat;
+                        console.log(`[Log] ${i + 1}번째 픽셀. 반복: ${repeat}, Red: ${red}, Green: ${green}, Blue: ${blue}`);
+                        for (let j = 0; j < repeat; j++) {
+                            pixels[pixelIndex++] = red;
+                            pixels[pixelIndex++] = green;
+                            pixels[pixelIndex++] = blue;
+                            pixels[pixelIndex++] = 255;
+                        }
+                    } else if (compressionType === 'skipOnly') {
+                        const alpha = type;
+                        const red = dataView.getUint8(start + i * 4 + 2);
+                        const green = dataView.getUint8(start + i * 4 + 3);
+                        const blue = dataView.getUint8(start + i * 4 + 3);
+                        paintedPixelCommands++;
+                        totalPaintedPixels++;
+                        console.log(`[Log] ${i + 1}번째 픽셀. Alpha: ${alpha}, Red: ${red}, Green: ${green}, Blue: ${blue}`);
+                        pixels[pixelIndex++] = red;
+                        pixels[pixelIndex++] = green;
+                        pixels[pixelIndex++] = blue;
+                        pixels[pixelIndex++] = alpha;
+                    }
+                } else {
+                    const skipCount = dataView.getUint8(start + i * 4 + 1);
+                    skippedPixelCommands++;
+                    totalSkippedPixels += skipCount;
+                    console.log(`[Log] ${i + 1}번째 픽셀 건너뜀. 반복: ${skipCount}`);
+                    pixelIndex += skipCount * 4;
+                }
+            }
+
+            console.log(`[Log] 이미지 압축 해제 완료. 칠하는 명령 수: ${paintedPixelCommands}, 칠한 픽셀 총 횟수: ${totalPaintedPixels}, 건너뛰는 명령 수: ${skippedPixelCommands}, 건너뛴 픽셀 총 횟수: ${totalSkippedPixels}`);
+            return pixels;
+        }
+
+        function createImageData(pixels, width, height) {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.createImageData(width, height);
+            imageData.data.set(pixels);
+            ctx.putImageData(imageData, 0, 0);
+            return canvas.toDataURL(); // Data URL 생성
+        }
+
+        function addImageToContainer(index, imageData) {
+            const div = document.createElement('div');
+            div.className = 'image-item';
+            div.innerHTML = `
+                <input type="checkbox" id="imageCheckbox${index}">
+                <label for="imageCheckbox${index}">${index}</label>
+                <img src="${imageData}" alt="Image ${index}">
+            `;
+            imageContainer.appendChild(div);
+        }
+
+        function exportSelectedImages() {
+            const checkboxes = document.querySelectorAll('.image-item input[type="checkbox"]:checked');
+            checkboxes.forEach((checkbox, index) => {
+                const img = checkbox.parentElement.querySelector('img');
+                downloadImage(img.src, `image_${index + 1}.png`);
+            });
+        }
+
+        function exportAllImages() {
+            const images = document.querySelectorAll('.image-item img');
+            images.forEach((img, index) => {
+                downloadImage(img.src, `image_${index + 1}.png`);
+            });
+        }
+
+        function downloadImage(dataUrl, filename) {
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    </script>
+</body>
+</html>
