@@ -51,11 +51,112 @@
         }
         body {
             margin: 0;
-            padding: 28px 32px 60px;
             background: var(--bg);
             color: var(--text);
             font-family: var(--font-mono);
             font-size: 14px;
+        }
+        .app-shell {
+            display: flex;
+            align-items: stretch;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 280px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            background: var(--surface);
+            border-right: 1px solid var(--border-soft);
+            overflow: hidden;
+            transition: width 0.15s ease, opacity 0.15s ease;
+        }
+        .sidebar.collapsed {
+            width: 0;
+            opacity: 0;
+            border-right: none;
+        }
+        .sidebar-header {
+            flex-shrink: 0;
+            padding: 16px;
+            border-bottom: 1px solid var(--border-soft);
+        }
+        .sidebar-header .file-input-button {
+            width: 100%;
+            text-align: center;
+        }
+        #folderInput {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        .file-tree {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 8px;
+            font-size: 12px;
+        }
+        .file-tree-empty {
+            padding: 8px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+        .tree-folder, .tree-file {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 6px;
+            border-radius: 3px;
+            cursor: pointer;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        .tree-folder:hover, .tree-file:hover {
+            background: var(--surface-hover);
+            color: var(--text);
+        }
+        .tree-file.active {
+            background: var(--accent-dim);
+            color: var(--bg);
+        }
+        .tree-toggle-icon, .tree-spacer {
+            display: inline-block;
+            width: 11px;
+            flex-shrink: 0;
+            font-size: 10px;
+            text-align: center;
+        }
+        .tree-children {
+            margin-left: 13px;
+        }
+        .tree-children.collapsed {
+            display: none;
+        }
+        .sidebar-toggle {
+            flex-shrink: 0;
+            width: 18px;
+            border: none;
+            border-right: 1px solid var(--border-soft);
+            background: var(--surface);
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 11px;
+            padding: 0;
+        }
+        .sidebar-toggle:hover {
+            color: var(--accent);
+            background: var(--surface-hover);
+        }
+        .main-content {
+            flex: 1;
+            min-width: 0;
+            padding: 28px 32px 60px;
         }
         h1 {
             font-family: var(--font-display);
@@ -275,34 +376,52 @@
     </style>
 </head>
 <body>
-    <h1>거상 이미지 Viewer</h1>
-    <div id="statusMessage"></div>
-    <div class="toolbar">
-        <label class="file-input-button" for="fileInput">파일 선택</label>
-        <input type="file" id="fileInput" accept=".s32,.agf">
-        <span id="fileNameDisplay">.agf 파일을 선택하세요 (구버전 .S32도 지원)</span>
-        <div class="toolbar-divider"></div>
-        <label class="skip-blank-label"><input type="checkbox" id="skipBlankToggle" checked> 빈 이미지 건너뛰기</label>
-        <div class="toolbar-divider"></div>
-        <label class="skip-blank-label"><input type="checkbox" id="animationModeToggle"> 애니메이션(GIF)로 보기</label>
-        <div class="toolbar-divider"></div>
-        <button id="selectAllToggle" disabled>전체 선택/해제</button>
-        <button id="exportSelected" disabled>선택한 이미지 내보내기</button>
-        <button id="exportAll" disabled>전체 내보내기</button>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <label class="file-input-button" for="folderInput">폴더 선택</label>
+                <input type="file" id="folderInput" webkitdirectory directory multiple>
+            </div>
+            <div class="file-tree" id="fileTree">
+                <div class="file-tree-empty">폴더를 선택하면 폴더 안의 .agf/.s32 파일을 트리로 볼 수 있습니다. 파일이 많을 때 대화상자를 반복해서 열지 않아도 됩니다.</div>
+            </div>
+        </aside>
+        <button class="sidebar-toggle" id="sidebarToggle" title="사이드바 접기/펼치기">◂</button>
+        <main class="main-content">
+            <h1>거상 이미지 Viewer</h1>
+            <div id="statusMessage"></div>
+            <div class="toolbar">
+                <label class="file-input-button" for="fileInput">파일 선택</label>
+                <input type="file" id="fileInput" accept=".s32,.agf">
+                <span id="fileNameDisplay">.agf 파일을 선택하세요 (구버전 .S32도 지원)</span>
+                <div class="toolbar-divider"></div>
+                <label class="skip-blank-label"><input type="checkbox" id="skipBlankToggle" checked> 빈 이미지 건너뛰기</label>
+                <div class="toolbar-divider"></div>
+                <label class="skip-blank-label"><input type="checkbox" id="animationModeToggle"> 애니메이션(GIF)로 보기</label>
+                <div class="toolbar-divider"></div>
+                <button id="selectAllToggle" disabled>전체 선택/해제</button>
+                <button id="exportSelected" disabled>선택한 이미지 내보내기</button>
+                <button id="exportAll" disabled>전체 내보내기</button>
+            </div>
+            <div id="gifPreviewContainer">
+                <img id="gifPreviewImage" alt="애니메이션 미리보기">
+                <div id="gifPreviewCaption"></div>
+            </div>
+            <div class="image-container" id="imageContainer"></div>
+            <footer class="page-footer">
+                <div>제작 · 현무 서버 !무쌍거상! (자동, 자동마저, 자동타저)</div>
+                <div>기여 안내 · <a href="https://github.com/2sem/gersang-image-extractor" target="_blank" rel="noopener">GitHub 저장소</a>에서 소스 코드 확인, 버그 제보(Issue), 개선 제안 및 Pull Request를 환영합니다.</div>
+                <div>문의 · 거상 현무 서버: 자동, 자동마저, 자동타저 / 카카오톡 오픈채팅 <a href="https://open.kakao.com/o/g2o1jY9d" target="_blank" rel="noopener">게임도우미</a></div>
+            </footer>
+        </main>
     </div>
-    <div id="gifPreviewContainer">
-        <img id="gifPreviewImage" alt="애니메이션 미리보기">
-        <div id="gifPreviewCaption"></div>
-    </div>
-    <div class="image-container" id="imageContainer"></div>
-    <footer class="page-footer">
-        <div>제작 · 현무 서버 !무쌍거상! (자동, 자동마저, 자동타저)</div>
-        <div>기여 안내 · <a href="https://github.com/2sem/gersang-image-extractor" target="_blank" rel="noopener">GitHub 저장소</a>에서 소스 코드 확인, 버그 제보(Issue), 개선 제안 및 Pull Request를 환영합니다.</div>
-        <div>문의 · 거상 현무 서버: 자동, 자동마저, 자동타저 / 카카오톡 오픈채팅 <a href="https://open.kakao.com/o/g2o1jY9d" target="_blank" rel="noopener">게임도우미</a></div>
-    </footer>
     <script>
         const fileInput = document.getElementById('fileInput');
         const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const folderInput = document.getElementById('folderInput');
+        const fileTree = document.getElementById('fileTree');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
         const imageContainer = document.getElementById('imageContainer');
         const exportSelectedButton = document.getElementById('exportSelected');
         const exportAllButton = document.getElementById('exportAll');
@@ -420,6 +539,11 @@
         }
 
         fileInput.addEventListener('change', handleFileSelect);
+        folderInput.addEventListener('change', handleFolderSelect);
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            sidebarToggle.textContent = sidebar.classList.contains('collapsed') ? '▸' : '◂';
+        });
         exportSelectedButton.addEventListener('click', exportSelectedImages);
         exportAllButton.addEventListener('click', exportAllImages);
         selectAllToggleButton.addEventListener('click', toggleSelectAll);
@@ -434,12 +558,12 @@
             }
         });
 
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
+        // Reads `file`, decodes it, and renders it — shared by the single-file picker
+        // and clicking a file in the folder tree. `displayLabel` (e.g. a relative
+        // path) overrides what's shown in the toolbar's file-name text.
+        function loadFile(file, displayLabel) {
             currentFileName = file.name;
-            fileNameDisplay.textContent = file.name;
+            fileNameDisplay.textContent = displayLabel || file.name;
             showInfo(`${file.name} 불러오는 중...`);
 
             const reader = new FileReader();
@@ -448,6 +572,90 @@
                 parseSpriteFile(currentBuffer);
             };
             reader.readAsArrayBuffer(file);
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            loadFile(file);
+        }
+
+        // Folder picker (webkitdirectory): reads every file under the chosen folder
+        // (recursively) as a flat FileList with `webkitRelativePath`, filters to
+        // .agf/.s32, and renders a collapsible tree in the sidebar so the user can
+        // click through many files without reopening the file-picker dialog each time.
+        const SPRITE_FILE_EXTENSIONS = /\.(agf|s32)$/i;
+        let activeTreeFileEl = null;
+
+        function handleFolderSelect(event) {
+            const files = Array.from(event.target.files).filter(f => SPRITE_FILE_EXTENSIONS.test(f.name));
+            fileTree.innerHTML = '';
+            activeTreeFileEl = null;
+
+            if (files.length === 0) {
+                fileTree.innerHTML = '<div class="file-tree-empty">선택한 폴더(하위 폴더 포함)에 .agf/.s32 파일이 없습니다.</div>';
+                return;
+            }
+
+            // Build a nested tree from each file's relative path, e.g.
+            // "MyFolder/AGF/ring01_i.AGF" -> { __folders: { AGF: { __files: [...] } } }
+            const root = { __folders: {}, __files: [] };
+            for (const file of files) {
+                const parts = file.webkitRelativePath.split('/');
+                let node = root;
+                for (let i = 1; i < parts.length - 1; i++) {
+                    node.__folders[parts[i]] = node.__folders[parts[i]] || { __folders: {}, __files: [] };
+                    node = node.__folders[parts[i]];
+                }
+                node.__files.push({ name: parts[parts.length - 1], file });
+            }
+
+            const rootLabel = files[0].webkitRelativePath.split('/')[0];
+            fileTree.appendChild(buildTreeNode(rootLabel, root));
+            showInfo(`${rootLabel} - .agf/.s32 파일 ${files.length}개 발견`);
+        }
+
+        function buildTreeNode(label, node) {
+            const wrapper = document.createElement('div');
+
+            const header = document.createElement('div');
+            header.className = 'tree-folder';
+            header.innerHTML = `<span class="tree-toggle-icon">▾</span><span>${label}</span>`;
+
+            const childrenEl = document.createElement('div');
+            childrenEl.className = 'tree-children';
+
+            const folderNames = Object.keys(node.__folders).sort();
+            for (const name of folderNames) {
+                childrenEl.appendChild(buildTreeNode(name, node.__folders[name]));
+            }
+
+            const fileEntries = node.__files.slice().sort((a, b) => a.name.localeCompare(b.name));
+            for (const { name, file } of fileEntries) {
+                const fileEl = document.createElement('div');
+                fileEl.className = 'tree-file';
+                fileEl.innerHTML = `<span class="tree-spacer"></span><span>${name}</span>`;
+                fileEl.addEventListener('click', () => selectTreeFile(fileEl, file));
+                childrenEl.appendChild(fileEl);
+            }
+
+            header.addEventListener('click', () => {
+                childrenEl.classList.toggle('collapsed');
+                header.querySelector('.tree-toggle-icon').textContent = childrenEl.classList.contains('collapsed') ? '▸' : '▾';
+            });
+
+            wrapper.appendChild(header);
+            wrapper.appendChild(childrenEl);
+            return wrapper;
+        }
+
+        function selectTreeFile(fileEl, file) {
+            if (activeTreeFileEl) {
+                activeTreeFileEl.classList.remove('active');
+            }
+            fileEl.classList.add('active');
+            activeTreeFileEl = fileEl;
+            loadFile(file, file.webkitRelativePath || file.name);
         }
 
         // 거상(Gersang) sprite container family. Both formats share a 16-byte header
