@@ -281,6 +281,35 @@
             reader.readAsArrayBuffer(file);
         }
 
+        // S32 sprite format, as used by 거상(Gersang)'s client — 32-bit color with an
+        // alpha channel (there are sibling variants: signature 0x0F is 32-bit without
+        // alpha, 0x09 is an 8-bit palette sprite; this tool only reads the alpha variant).
+        // Layout cross-checked against the independent reference decoder at
+        // https://github.com/hallazzang/gosang (sprite32alpha.go).
+        //
+        //   offset 0            : header — u32 signature, u32 width, u32 height, u32 frameCount
+        //   offset 0x4c0 (1216) : u32[frameCount] frame data offset, relative to FRAME_DATA_BASE
+        //   offset 0x970 (2416) : u32[frameCount] frame pixel-op record count
+        //   offset 0xe4c (3660) : frame pixel-op streams begin here
+        //
+        // Both tables reserve a fixed 1200-byte block (up to 300 frames) regardless of
+        // the actual frameCount, which is why the two table offsets are fixed constants
+        // rather than derived from frameCount.
+        const S32_SIGNATURE_ALPHA32 = 25; // 0x19
+        const S32_FRAME_OFFSETS_OFFSET = 1216; // 0x4c0
+        const S32_FRAME_RECORD_COUNTS_OFFSET = 2416; // 0x970
+        const S32_FRAME_DATA_BASE = 3660; // 0xe4c
+
+        function readFrameTable(dataView, frameCount) {
+            const offsets = [];
+            const recordCounts = [];
+            for (let i = 0; i < frameCount; i++) {
+                offsets.push(dataView.getUint32(S32_FRAME_OFFSETS_OFFSET + i * 4, true) + S32_FRAME_DATA_BASE);
+                recordCounts.push(dataView.getUint32(S32_FRAME_RECORD_COUNTS_OFFSET + i * 4, true));
+            }
+            return { offsets, recordCounts };
+        }
+
         function parseS32File(buffer) {
             imageContainer.innerHTML = '';
             exportSelectedButton.disabled = true;
@@ -289,16 +318,21 @@
             clearStatus();
 
             try {
-                if (buffer.byteLength < 2416) {
+                if (buffer.byteLength < S32_FRAME_RECORD_COUNTS_OFFSET) {
                     throw new Error('파일이 너무 작습니다. 올바른 S32 파일이 아닙니다.');
                 }
 
                 const dataView = new DataView(buffer);
-                console.log("[Log] 파일 종류:", dataView.getUint32(0, true));
+                const signature = dataView.getUint32(0, true);
+                console.log("[Log] 파일 종류:", signature);
                 console.log("[Log] 이미지 넓이:", dataView.getUint32(4, true));
                 console.log("[Log] 이미지 높이:", dataView.getUint32(8, true));
                 const imageCount = dataView.getUint32(12, true);
                 console.log("[Log] 압축된 이미지 수:", imageCount);
+
+                if (signature !== S32_SIGNATURE_ALPHA32) {
+                    throw new Error(`지원하지 않는 스프라이트 형식입니다 (signature=0x${signature.toString(16)}). 알파 채널이 있는 S32 파일(signature=0x19)만 지원합니다.`);
+                }
 
                 const width = dataView.getUint32(4, true);
                 const height = dataView.getUint32(8, true);
@@ -307,17 +341,15 @@
                     throw new Error('이미지 크기 정보가 올바르지 않습니다. 올바른 S32 파일이 아닙니다.');
                 }
 
-                const tableEnd = Math.max(1216 + imageCount * 4, 2416 + imageCount * 4);
+                const tableEnd = Math.max(
+                    S32_FRAME_OFFSETS_OFFSET + imageCount * 4,
+                    S32_FRAME_RECORD_COUNTS_OFFSET + imageCount * 4
+                );
                 if (imageCount < 0 || buffer.byteLength < tableEnd) {
                     throw new Error('이미지 개수 정보가 올바르지 않습니다. 올바른 S32 파일이 아닙니다.');
                 }
 
-                const startPositions = [];
-                const compressedPixelCounts = [];
-                for (let i = 0; i < imageCount; i++) {
-                    startPositions.push(dataView.getUint32(1216 + i * 4, true) + 3660);
-                    compressedPixelCounts.push(dataView.getUint32(2416 + i * 4, true));
-                }
+                const { offsets: startPositions, recordCounts: compressedPixelCounts } = readFrameTable(dataView, imageCount);
 
                 let renderedCount = 0;
                 for (let i = 0; i < imageCount; i++) {
@@ -355,6 +387,14 @@
             }
         }
 
+        // Decodes one frame's pixel-op stream, starting at byte offset `start`, `count`
+        // 4-byte records long, into a flat RGBA buffer (raster order).
+        //
+        // Each record is [Alpha, Red, Green, Blue]:
+        //   - Alpha == 0 (and Green == Blue == 0, per the reference decoder) is a skip
+        //     run: Red holds the number of fully-transparent pixels to advance over.
+        //   - Otherwise it paints exactly one pixel using the record's own alpha —
+        //     there is no run-length repeat for painted pixels.
         function decompressPixels(dataView, start, count, width, height) {
             const pixels = new Uint8ClampedArray(width * height * 4);
             let pixelIndex = 0;
@@ -363,17 +403,14 @@
             let totalSkippedPixels = 0; // 건너뛴 픽셀의 총 횟수
 
             for (let i = 0; i < count; i++) {
-                const type = dataView.getUint8(start + i * 4);
-                const hexValue = Array.from({ length: 4 }, (_, j) =>
-                    dataView.getUint8(start + i * 4 + j).toString(16).padStart(2, '0')
-                ).join(' ');
-                console.log(`[Log] ${i + 1}번째 픽셀 Hex: ${hexValue}`);
+                const alpha = dataView.getUint8(start + i * 4);
+                const red = dataView.getUint8(start + i * 4 + 1);
+                const green = dataView.getUint8(start + i * 4 + 2);
+                const blue = dataView.getUint8(start + i * 4 + 3);
+                console.log(`[Log] ${i + 1}번째 픽셀 Hex: ${[alpha, red, green, blue].map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
 
-                if (type > 0) {
-                    const alpha = type;
-                    const red = dataView.getUint8(start + i * 4 + 1);
-                    const green = dataView.getUint8(start + i * 4 + 2);
-                    const blue = dataView.getUint8(start + i * 4 + 3);
+                const isSkip = alpha === 0 && green === 0 && blue === 0;
+                if (!isSkip) {
                     paintedPixelCommands++;
                     console.log(`[Log] ${i + 1}번째 픽셀. Alpha: ${alpha}, Red: ${red}, Green: ${green}, Blue: ${blue}`);
                     pixels[pixelIndex++] = red;
@@ -381,7 +418,7 @@
                     pixels[pixelIndex++] = blue;
                     pixels[pixelIndex++] = alpha;
                 } else {
-                    const skipCount = dataView.getUint8(start + i * 4 + 1);
+                    const skipCount = red;
                     skippedPixelCommands++;
                     totalSkippedPixels += skipCount;
                     console.log(`[Log] ${i + 1}번째 픽셀 건너뜀. 반복: ${skipCount}`);
