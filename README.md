@@ -4,6 +4,8 @@ A single-page, no-build browser tool that extracts sprite frames from 거상(Ger
 
 Live at GitHub Pages: `index.html` is the entry point.
 
+![거상 이미지 Viewer showing ring01_i.AGF loaded, 17 non-blank frames out of 100 displayed](docs/screenshot.png)
+
 ## Features
 
 - Loads `.S32` and `.AGF` sprite files and renders every frame as a thumbnail.
