@@ -241,6 +241,9 @@
             font-size: 12px;
             color: var(--text-muted);
         }
+        .page-footer div + div {
+            margin-top: 6px;
+        }
         .page-footer a {
             color: var(--accent);
             text-decoration: none;
@@ -270,7 +273,8 @@
     </div>
     <div class="image-container" id="imageContainer"></div>
     <footer class="page-footer">
-        기여 안내 · <a href="https://github.com/2sem/gersang-image-extractor" target="_blank" rel="noopener">GitHub 저장소</a>에서 소스 코드 확인, 버그 제보(Issue), 개선 제안 및 Pull Request를 환영합니다.
+        <div>기여 안내 · <a href="https://github.com/2sem/gersang-image-extractor" target="_blank" rel="noopener">GitHub 저장소</a>에서 소스 코드 확인, 버그 제보(Issue), 개선 제안 및 Pull Request를 환영합니다.</div>
+        <div>문의 · 거상 현무 서버: 자동, 자동마저, 자동타저 / 카카오톡 오픈채팅 <a href="https://open.kakao.com/o/g2o1jY9d" target="_blank" rel="noopener">게임도우미</a></div>
     </footer>
     <script>
         const fileInput = document.getElementById('fileInput');
