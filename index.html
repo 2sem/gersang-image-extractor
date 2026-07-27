@@ -207,6 +207,33 @@
             max-width: 100%;
             cursor: pointer;
         }
+        #gifPreviewContainer {
+            display: none;
+            margin-bottom: 24px;
+            padding: 16px;
+            border: 1px solid var(--border-soft);
+            border-radius: 4px;
+            background: var(--surface);
+            text-align: center;
+        }
+        #gifPreviewImage {
+            display: inline-block;
+            width: min(220px, 100%);
+            height: auto;
+            image-rendering: pixelated;
+            background-image:
+                linear-gradient(45deg, #80808022 25%, transparent 25%),
+                linear-gradient(-45deg, #80808022 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #80808022 75%),
+                linear-gradient(-45deg, transparent 75%, #80808022 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+        }
+        #gifPreviewCaption {
+            margin-top: 10px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
     </style>
 </head>
 <body>
@@ -217,9 +244,15 @@
         <div class="toolbar-divider"></div>
         <label class="skip-blank-label"><input type="checkbox" id="skipBlankToggle" checked> 빈 이미지 건너뛰기</label>
         <div class="toolbar-divider"></div>
+        <label class="skip-blank-label"><input type="checkbox" id="animationModeToggle"> 애니메이션(GIF)로 보기</label>
+        <div class="toolbar-divider"></div>
         <button id="selectAllToggle" disabled>전체 선택/해제</button>
         <button id="exportSelected" disabled>선택한 이미지 내보내기</button>
         <button id="exportAll" disabled>전체 내보내기</button>
+    </div>
+    <div id="gifPreviewContainer">
+        <img id="gifPreviewImage" alt="애니메이션 미리보기">
+        <div id="gifPreviewCaption"></div>
     </div>
     <div class="image-container" id="imageContainer"></div>
     <script>
@@ -229,9 +262,46 @@
         const exportAllButton = document.getElementById('exportAll');
         const selectAllToggleButton = document.getElementById('selectAllToggle');
         const skipBlankToggle = document.getElementById('skipBlankToggle');
+        const animationModeToggle = document.getElementById('animationModeToggle');
+        const gifPreviewContainer = document.getElementById('gifPreviewContainer');
+        const gifPreviewImage = document.getElementById('gifPreviewImage');
+        const gifPreviewCaption = document.getElementById('gifPreviewCaption');
         const statusMessage = document.getElementById('statusMessage');
 
         let currentBuffer = null;
+
+        // Populated when animationModeToggle is checked and a file is loaded: the
+        // shown frames' full-canvas RGBA buffers (for on-demand GIF export) and their
+        // already-rendered data URLs (for the live preview, which just cycles through
+        // the original frames — no GIF encoding happens until export is clicked).
+        let currentAnimationFrames = null;
+        let currentAnimationFrameDataUrls = null;
+        let currentAnimationWidth = 0;
+        let currentAnimationHeight = 0;
+        let gifPreviewIntervalId = null;
+
+        const GIF_PREVIEW_INTERVAL_MS = 100;
+        const GIF_FRAME_DELAY_CS = 10; // 100ms per frame, matches the preview's pace
+
+        function startGifPreview() {
+            gifPreviewContainer.style.display = 'block';
+            gifPreviewCaption.textContent = `애니메이션 미리보기 - ${currentAnimationFrameDataUrls.length}프레임 (내보내기 시 GIF로 저장됩니다)`;
+            let frameIndex = 0;
+            gifPreviewImage.src = currentAnimationFrameDataUrls[0];
+            gifPreviewIntervalId = setInterval(() => {
+                frameIndex = (frameIndex + 1) % currentAnimationFrameDataUrls.length;
+                gifPreviewImage.src = currentAnimationFrameDataUrls[frameIndex];
+            }, GIF_PREVIEW_INTERVAL_MS);
+        }
+
+        function stopGifPreview() {
+            if (gifPreviewIntervalId !== null) {
+                clearInterval(gifPreviewIntervalId);
+                gifPreviewIntervalId = null;
+            }
+            gifPreviewContainer.style.display = 'none';
+            gifPreviewImage.removeAttribute('src');
+        }
 
         function toggleSelectAll() {
             const checkboxes = document.querySelectorAll('.image-item input[type="checkbox"]');
@@ -261,6 +331,11 @@
         exportAllButton.addEventListener('click', exportAllImages);
         selectAllToggleButton.addEventListener('click', toggleSelectAll);
         skipBlankToggle.addEventListener('change', () => {
+            if (currentBuffer) {
+                parseSpriteFile(currentBuffer);
+            }
+        });
+        animationModeToggle.addEventListener('change', () => {
             if (currentBuffer) {
                 parseSpriteFile(currentBuffer);
             }
@@ -410,6 +485,9 @@
             exportSelectedButton.disabled = true;
             exportAllButton.disabled = true;
             selectAllToggleButton.disabled = true;
+            stopGifPreview();
+            currentAnimationFrames = null;
+            currentAnimationFrameDataUrls = null;
             clearStatus();
 
             try {
@@ -437,6 +515,10 @@
                     throw new Error(`지원하지 않는 스프라이트 형식입니다 (signature=0x${signature.toString(16)}). S32(0x19) 또는 AGF(0x23) 파일만 지원합니다.`);
                 }
 
+                const wantAnimationFrames = animationModeToggle.checked;
+                const animationFrames = wantAnimationFrames ? [] : null;
+                const animationFrameDataUrls = wantAnimationFrames ? [] : null;
+
                 let renderedCount = 0;
                 for (let i = 0; i < sprite.frameCount; i++) {
                     const frame = sprite.getFrame(i);
@@ -447,17 +529,35 @@
                         continue;
                     }
 
-                    const imageData = createImageData(frame.pixels, frame.w, frame.h, sprite.width, sprite.height, frame.x, frame.y);
-                    addImageToContainer(i + 1, imageData);
+                    const canvas = renderFrameCanvas(frame.pixels, frame.w, frame.h, sprite.width, sprite.height, frame.x, frame.y);
+                    const dataUrl = canvas.toDataURL();
+                    addImageToContainer(i + 1, dataUrl);
                     renderedCount++;
+
+                    if (wantAnimationFrames) {
+                        animationFrameDataUrls.push(dataUrl);
+                        animationFrames.push(canvas.getContext('2d').getImageData(0, 0, sprite.width, sprite.height).data);
+                    }
+                }
+
+                let statusExtra = '';
+                if (wantAnimationFrames && animationFrames.length > 0) {
+                    currentAnimationFrames = animationFrames;
+                    currentAnimationFrameDataUrls = animationFrameDataUrls;
+                    currentAnimationWidth = sprite.width;
+                    currentAnimationHeight = sprite.height;
+                    startGifPreview();
+                    statusExtra = ` / 애니메이션 미리보기 ${animationFrames.length}프레임 (내보내기 시 GIF로 저장)`;
+                } else if (wantAnimationFrames) {
+                    statusExtra = ' / 애니메이션으로 표시할 프레임이 없습니다';
                 }
 
                 exportSelectedButton.disabled = renderedCount === 0;
                 exportAllButton.disabled = renderedCount === 0;
                 selectAllToggleButton.disabled = renderedCount === 0;
-                showInfo(renderedCount === sprite.frameCount
+                showInfo((renderedCount === sprite.frameCount
                     ? `${currentFileName} - 이미지 ${sprite.frameCount}개 로드 완료`
-                    : `${currentFileName} - 이미지 ${sprite.frameCount}개 중 ${renderedCount}개 표시 (빈 이미지 ${sprite.frameCount - renderedCount}개 제외)`);
+                    : `${currentFileName} - 이미지 ${sprite.frameCount}개 중 ${renderedCount}개 표시 (빈 이미지 ${sprite.frameCount - renderedCount}개 제외)`) + statusExtra);
                 console.log(`[Log] 파일에서 이미지 추출 완료, 추출된 이미지 개수: ${sprite.frameCount}`);
             } catch (err) {
                 console.error('[Log] 파일 파싱 오류:', err);
@@ -513,8 +613,10 @@
         // `pixels` is a (pixelWidth x pixelHeight) RGBA buffer painted onto a
         // (canvasWidth x canvasHeight) canvas at (offsetX, offsetY) — for S32, the
         // pixel buffer always fills the whole canvas (offset 0,0); for AGF, frames
-        // are trimmed to a bounding box smaller than the full canvas.
-        function createImageData(pixels, pixelWidth, pixelHeight, canvasWidth, canvasHeight, offsetX, offsetY) {
+        // are trimmed to a bounding box smaller than the full canvas. Returns the
+        // canvas itself (not a data URL) so callers can also read back raw RGBA via
+        // getImageData, e.g. for GIF frame capture.
+        function renderFrameCanvas(pixels, pixelWidth, pixelHeight, canvasWidth, canvasHeight, offsetX, offsetY) {
             const canvas = document.createElement('canvas');
             canvas.width = canvasWidth;
             canvas.height = canvasHeight;
@@ -524,7 +626,7 @@
                 imageData.data.set(pixels);
                 ctx.putImageData(imageData, offsetX, offsetY);
             }
-            return canvas.toDataURL(); // Data URL 생성
+            return canvas;
         }
 
         function addImageToContainer(index, imageData) {
@@ -548,6 +650,10 @@
         const DOWNLOAD_INTERVAL_MS = 300;
 
         function exportSelectedImages() {
+            if (animationModeToggle.checked) {
+                exportAnimationAsGif();
+                return;
+            }
             const checkboxes = document.querySelectorAll('.image-item input[type="checkbox"]:checked');
             checkboxes.forEach((checkbox, index) => {
                 const img = checkbox.parentElement.querySelector('img');
@@ -556,6 +662,10 @@
         }
 
         function exportAllImages() {
+            if (animationModeToggle.checked) {
+                exportAnimationAsGif();
+                return;
+            }
             const images = document.querySelectorAll('.image-item img');
             images.forEach((img, index) => {
                 setTimeout(() => downloadImage(img.src, `image_${index + 1}.png`), index * DOWNLOAD_INTERVAL_MS);
@@ -569,6 +679,273 @@
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+        }
+
+        // Builds an actual GIF only when the user exports — the live preview above
+        // just cycles the original (full-quality, non-palette-quantized) frame
+        // images, so this is the one place GIF-specific lossy encoding happens.
+        async function exportAnimationAsGif() {
+            if (!currentAnimationFrames || currentAnimationFrames.length === 0) {
+                showError('GIF로 내보낼 프레임이 없습니다.');
+                return;
+            }
+            const frameCount = currentAnimationFrames.length;
+            showInfo(`${currentFileName} - GIF 생성 중... (${frameCount}프레임)`);
+            await new Promise(resolve => setTimeout(resolve, 0)); // let the status message paint before the synchronous encode
+
+            try {
+                const gifBytes = encodeAnimatedGif(currentAnimationFrames, currentAnimationWidth, currentAnimationHeight, GIF_FRAME_DELAY_CS);
+                const blob = new Blob([gifBytes], { type: 'image/gif' });
+                const url = URL.createObjectURL(blob);
+                const baseName = (currentFileName || 'animation').replace(/\.(s32|agf)$/i, '');
+                downloadImage(url, `${baseName}.gif`);
+                showInfo(`${currentFileName} - GIF 내보내기 완료 (${frameCount}프레임)`);
+            } catch (err) {
+                console.error('[Log] GIF 생성 오류:', err);
+                showError(`GIF 생성 중 오류가 발생했습니다: ${err.message || err}`);
+            }
+        }
+
+        // ---- Minimal GIF89a encoder (median-cut palette + LZW) ----
+        // No external library: builds a single global color table shared across all
+        // frames (simple, at some quality cost for very color-rich animations), maps
+        // alpha < 128 to one reserved transparent index, and writes GIF89a bytes by
+        // hand per the spec (Logical Screen Descriptor, Global Color Table, NETSCAPE
+        // looping extension, then per-frame Graphic Control Extension + Image
+        // Descriptor + LZW-compressed, sub-blocked pixel data).
+
+        function appendBytes(dest, src) {
+            for (let i = 0; i < src.length; i++) dest.push(src[i]);
+        }
+
+        function u16le(n) {
+            return [n & 0xff, (n >> 8) & 0xff];
+        }
+
+        // Frequency-weighted histogram of opaque colors across all frames, so the
+        // quantizer works from a much smaller set than the raw pixel count.
+        function collectColorHistogram(frames) {
+            const counts = new Map();
+            for (const rgba of frames) {
+                for (let i = 0; i < rgba.length; i += 4) {
+                    if (rgba[i + 3] < 128) continue;
+                    const key = (rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2];
+                    counts.set(key, (counts.get(key) || 0) + 1);
+                }
+            }
+            const histogram = [];
+            for (const [key, count] of counts) {
+                histogram.push({ r: (key >> 16) & 0xff, g: (key >> 8) & 0xff, b: key & 0xff, count });
+            }
+            return histogram;
+        }
+
+        // Weighted median-cut color quantization down to at most `maxColors` entries.
+        function medianCutQuantize(histogram, maxColors) {
+            if (histogram.length === 0) return [[0, 0, 0]];
+            if (histogram.length <= maxColors) {
+                return histogram.map(c => [c.r, c.g, c.b]);
+            }
+
+            let buckets = [histogram];
+            let guard = 0;
+            while (buckets.length < maxColors && guard++ < maxColors * 4) {
+                let splitIdx = -1, splitChannel = 'r', maxRange = -1;
+                for (let idx = 0; idx < buckets.length; idx++) {
+                    const bucket = buckets[idx];
+                    if (bucket.length < 2) continue;
+                    for (const channel of ['r', 'g', 'b']) {
+                        let min = Infinity, max = -Infinity;
+                        for (const p of bucket) {
+                            if (p[channel] < min) min = p[channel];
+                            if (p[channel] > max) max = p[channel];
+                        }
+                        const range = max - min;
+                        if (range > maxRange) { maxRange = range; splitIdx = idx; splitChannel = channel; }
+                    }
+                }
+                if (splitIdx === -1) break;
+
+                const bucket = buckets[splitIdx].slice().sort((a, b) => a[splitChannel] - b[splitChannel]);
+                const totalCount = bucket.reduce((s, p) => s + p.count, 0);
+                let acc = 0, mid = bucket.length - 2;
+                for (let i = 0; i < bucket.length; i++) {
+                    acc += bucket[i].count;
+                    if (acc >= totalCount / 2) { mid = Math.min(i, bucket.length - 2); break; }
+                }
+                const left = bucket.slice(0, mid + 1);
+                const right = bucket.slice(mid + 1);
+                buckets.splice(splitIdx, 1, left, right);
+            }
+
+            return buckets.map(bucket => {
+                let sr = 0, sg = 0, sb = 0, n = 0;
+                for (const p of bucket) { sr += p.r * p.count; sg += p.g * p.count; sb += p.b * p.count; n += p.count; }
+                return n > 0 ? [Math.round(sr / n), Math.round(sg / n), Math.round(sb / n)] : [0, 0, 0];
+            });
+        }
+
+        function makeNearestColorFn(palette) {
+            return function nearestColorIndex(r, g, b) {
+                let bestIndex = 0, bestDist = Infinity;
+                for (let i = 0; i < palette.length; i++) {
+                    const [pr, pg, pb] = palette[i];
+                    const dr = r - pr, dg = g - pg, db = b - pb;
+                    const dist = dr * dr + dg * dg + db * db;
+                    if (dist < bestDist) { bestDist = dist; bestIndex = i; }
+                }
+                return bestIndex;
+            };
+        }
+
+        // Packs variable-width LZW codes into bytes, LSB-first, per the GIF spec.
+        function createBitWriter() {
+            const bytes = [];
+            let bitBuffer = 0;
+            let bitCount = 0;
+            return {
+                writeCode(code, size) {
+                    bitBuffer |= code << bitCount;
+                    bitCount += size;
+                    while (bitCount >= 8) {
+                        bytes.push(bitBuffer & 0xff);
+                        bitBuffer >>= 8;
+                        bitCount -= 8;
+                    }
+                },
+                flush() {
+                    if (bitCount > 0) {
+                        bytes.push(bitBuffer & 0xff);
+                        bitBuffer = 0;
+                        bitCount = 0;
+                    }
+                },
+                getBytes() {
+                    return bytes;
+                },
+            };
+        }
+
+        // GIF-flavored LZW: dictionary keyed by comma-joined index strings, codes
+        // reset via a clear code when the 12-bit dictionary fills up.
+        function lzwEncode(indices, minCodeSize) {
+            const clearCode = 1 << minCodeSize;
+            const endCode = clearCode + 1;
+            const writer = createBitWriter();
+
+            let dict, codeSize, nextCode;
+            function resetDict() {
+                dict = new Map();
+                for (let i = 0; i < clearCode; i++) dict.set(String(i), i);
+                nextCode = endCode + 1;
+                codeSize = minCodeSize + 1;
+            }
+            resetDict();
+            writer.writeCode(clearCode, codeSize);
+
+            let w = String(indices[0]);
+            for (let i = 1; i < indices.length; i++) {
+                const k = String(indices[i]);
+                const wk = w + ',' + k;
+                if (dict.has(wk)) {
+                    w = wk;
+                    continue;
+                }
+                writer.writeCode(dict.get(w), codeSize);
+                if (nextCode < 4096) {
+                    dict.set(wk, nextCode++);
+                    if (nextCode > (1 << codeSize) && codeSize < 12) {
+                        codeSize++;
+                    }
+                } else {
+                    writer.writeCode(clearCode, codeSize);
+                    resetDict();
+                }
+                w = k;
+            }
+            writer.writeCode(dict.get(w), codeSize);
+            writer.writeCode(endCode, codeSize);
+            writer.flush();
+            return writer.getBytes();
+        }
+
+        // Wraps raw bytes into GIF sub-blocks: a length byte (max 255) followed by
+        // that many data bytes, repeated, terminated by a zero-length block.
+        function packSubBlocks(bytes) {
+            const out = [];
+            let i = 0;
+            while (i < bytes.length) {
+                const chunkLen = Math.min(255, bytes.length - i);
+                out.push(chunkLen);
+                for (let j = 0; j < chunkLen; j++) out.push(bytes[i + j]);
+                i += chunkLen;
+            }
+            out.push(0);
+            return out;
+        }
+
+        function encodeAnimatedGif(frames, width, height, delayCentiseconds) {
+            const MAX_PALETTE_COLORS = 255; // 1 slot reserved for transparency
+            const histogram = collectColorHistogram(frames);
+            const paletteColors = medianCutQuantize(histogram, MAX_PALETTE_COLORS);
+            const transparentIndex = paletteColors.length;
+            const numColors = paletteColors.length + 1;
+            const minCodeSize = Math.max(2, Math.ceil(Math.log2(numColors)));
+            const colorTableSize = 1 << minCodeSize;
+
+            const fullPalette = paletteColors.slice();
+            while (fullPalette.length < colorTableSize) fullPalette.push([0, 0, 0]);
+
+            const nearestColorIndex = makeNearestColorFn(paletteColors);
+
+            const bytes = [];
+            appendBytes(bytes, 'GIF89a'.split('').map(c => c.charCodeAt(0)));
+            appendBytes(bytes, u16le(width));
+            appendBytes(bytes, u16le(height));
+            const gctFlag = 1, colorRes = minCodeSize - 1, sortFlag = 0, gctSizeField = minCodeSize - 1;
+            bytes.push((gctFlag << 7) | (colorRes << 4) | (sortFlag << 3) | gctSizeField);
+            bytes.push(0); // background color index
+            bytes.push(0); // pixel aspect ratio
+            for (const [r, g, b] of fullPalette) bytes.push(r, g, b);
+
+            // Application Extension (NETSCAPE2.0): loop count 0 = infinite
+            bytes.push(0x21, 0xff, 0x0b);
+            appendBytes(bytes, 'NETSCAPE2.0'.split('').map(c => c.charCodeAt(0)));
+            bytes.push(3, 1, 0, 0, 0);
+
+            for (const rgba of frames) {
+                // Graphic Control Extension
+                bytes.push(0x21, 0xf9, 4);
+                const disposalMethod = 1; // do not dispose — every frame covers the full canvas anyway
+                const transparentFlag = 1;
+                bytes.push((disposalMethod << 2) | transparentFlag);
+                appendBytes(bytes, u16le(delayCentiseconds));
+                bytes.push(transparentIndex);
+                bytes.push(0);
+
+                // Image Descriptor (always full canvas, no per-frame positioning needed)
+                bytes.push(0x2c);
+                appendBytes(bytes, u16le(0));
+                appendBytes(bytes, u16le(0));
+                appendBytes(bytes, u16le(width));
+                appendBytes(bytes, u16le(height));
+                bytes.push(0); // no local color table, not interlaced
+
+                const pixelCount = width * height;
+                const indices = new Uint8Array(pixelCount);
+                for (let p = 0; p < pixelCount; p++) {
+                    const a = rgba[p * 4 + 3];
+                    indices[p] = a < 128
+                        ? transparentIndex
+                        : nearestColorIndex(rgba[p * 4], rgba[p * 4 + 1], rgba[p * 4 + 2]);
+                }
+
+                bytes.push(minCodeSize);
+                appendBytes(bytes, packSubBlocks(lzwEncode(indices, minCodeSize)));
+            }
+
+            bytes.push(0x3b); // trailer
+            return new Uint8Array(bytes);
         }
     </script>
 </body>

@@ -48,17 +48,29 @@ An earlier "압축" (compressed) mode treated the type byte as a repeat count in
 Everything lives in one `<script>` block, in read order:
 
 1. `handleFileSelect` — file input → `FileReader` → `parseSpriteFile` (async).
-2. `parseSpriteFile` — reads the shared header, reads `signature` to dispatch to `readS32Sprite` or (`await`) `readAGFSprite`, then loops `sprite.frameCount` calling `sprite.getFrame(i)` → `createImageData` → `addImageToContainer`. Both readers return the same shape: `{width, height, frameCount, getFrame(i) => {pixels, isBlank, x, y, w, h}}`, so the render loop, skip-blank filtering, and status/button-disable logic are format-agnostic.
+2. `parseSpriteFile` — reads the shared header, reads `signature` to dispatch to `readS32Sprite` or (`await`) `readAGFSprite`, then loops `sprite.frameCount` calling `sprite.getFrame(i)` → `renderFrameCanvas` → `addImageToContainer`. Both readers return the same shape: `{width, height, frameCount, getFrame(i) => {pixels, isBlank, x, y, w, h}}`, so the render loop, skip-blank filtering, and status/button-disable logic are format-agnostic.
 3. `readS32Sprite` — reads the offset/record-count tables, `getFrame(i)` calls `decompressPixels` directly against the file's `DataView` (data is uncompressed).
 4. `readAGFSprite` (async) — reads the offset/bbox tables and trailer, `await inflateZlib(...)` once up front for the whole frame-data region, then `getFrame(i)` slices the decompressed buffer per-frame and calls `decompressPixels` against a `DataView` over that buffer.
 5. `inflateZlib` — wraps the browser-native `DecompressionStream('deflate')` in a `Blob`/`Response` round-trip to inflate a zlib byte stream; no external library.
 6. `decompressPixels` — the core RLE decoder per the format spec above; shared by both readers.
-7. `createImageData` — writes decoded RGBA pixels into an offscreen `<canvas>`, composited at `(offsetX, offsetY)` so AGF's trimmed per-frame bounding box lands in the right place on the full canvas (S32 frames always pass `offsetX=offsetY=0` and fill the whole canvas).
+7. `renderFrameCanvas` — writes decoded RGBA pixels into an offscreen `<canvas>`, composited at `(offsetX, offsetY)` so AGF's trimmed per-frame bounding box lands in the right place on the full canvas (S32 frames always pass `offsetX=offsetY=0` and fill the whole canvas). Returns the canvas itself (not a data URL) so callers can also read back raw RGBA via `getImageData` — used for GIF frame capture.
 8. `addImageToContainer` — renders one numbered, checkbox-selectable thumbnail into `#imageContainer`; also wires a click handler so tapping anywhere on the card (image or padding) toggles its checkbox without double-firing when the checkbox/label itself is clicked.
-9. `exportSelectedImages` / `exportAllImages` / `downloadImage` — trigger PNG downloads via synthetic `<a download>` clicks, staggered `DOWNLOAD_INTERVAL_MS` apart to avoid the browser blocking a burst of same-tick downloads.
+9. `exportSelectedImages` / `exportAllImages` / `downloadImage` — trigger PNG downloads via synthetic `<a download>` clicks, staggered `DOWNLOAD_INTERVAL_MS` apart to avoid the browser blocking a burst of same-tick downloads — unless `#animationModeToggle` is checked, in which case both export buttons call `exportAnimationAsGif` instead (see below).
 
 `parseSpriteFile` validates buffer size and header sanity (throws/shows a user-facing error via `showError` on garbage input) and reports load status (`showInfo`) — see `statusMessage` element.
 
 Many sprite files have mostly-empty frame slots (e.g. `sample/S32/Helmet01_I.S32` has 99 fully-transparent frames out of 100). `#skipBlankToggle` (checked by default) hides frames where a reader's `getFrame` set `isBlank` (no painted pixel-ops); `currentBuffer` caches the last-loaded `ArrayBuffer` so toggling it re-runs `parseSpriteFile` without re-picking the file.
 
-Visual design: warm charcoal/amber theme (CSS variables in the `<style>` block), light/dark via `prefers-color-scheme`, card-based gallery grid. Pure CSS — no DOM structure the JS depends on was changed for it.
+### Animation (GIF) mode
+
+`#animationModeToggle` treats the currently-shown frames (same set skip-blank would show) as an animation sequence instead of independent items. When checked, `parseSpriteFile`'s render loop also captures each shown frame's full-canvas RGBA (`canvas.getContext('2d').getImageData(...)`) into `currentAnimationFrames`, and its already-rendered data URL into `currentAnimationFrameDataUrls`. `startGifPreview` then cycles `#gifPreviewImage.src` through those data URLs on a `setInterval` (`GIF_PREVIEW_INTERVAL_MS`) — this is just flipping through the original, full-quality PNGs already on screen, no GIF encoding involved, so the preview is instant regardless of file size.
+
+Actual GIF encoding only happens in `exportAnimationAsGif`, called when either export button is clicked while animation mode is on. It runs `encodeAnimatedGif` (a from-scratch GIF89a encoder — no external library, consistent with the rest of this tool):
+- `collectColorHistogram` + `medianCutQuantize` — frequency-weighted median-cut color quantization across *all* frames combined, producing one shared global palette (≤255 colors, 1 slot reserved for a transparent index) rather than per-frame local color tables.
+- `makeNearestColorFn` — brute-force nearest-color lookup per pixel against that palette (fast enough at this scale — up to ~100 frames × ~3600px was well under a second in testing).
+- `createBitWriter` + `lzwEncode` — GIF-flavored variable-width LZW compression of each frame's palette-index stream.
+- `encodeAnimatedGif` assembles the actual GIF89a byte stream by hand (Logical Screen Descriptor, Global Color Table, `NETSCAPE2.0` looping extension, then a Graphic Control Extension + Image Descriptor + LZW sub-blocks per frame) at `GIF_FRAME_DELAY_CS` (10 centiseconds = 100ms, matching the preview's pace).
+
+Alpha < 128 maps to the transparent palette index; there's no partial-alpha support in GIF, so translucent edge pixels get hard-thresholded. Validated by decoding exported GIFs with Pillow (correct frame count/size/loop/duration) and visually inspecting frames.
+
+Visual design: warm charcoal/amber theme (CSS variables in the `<style>` block), light/dark via `prefers-color-scheme`, card-based gallery grid, checkerboard backdrop behind the GIF preview to show transparency. Pure CSS — no DOM structure the JS depends on was changed for it.
