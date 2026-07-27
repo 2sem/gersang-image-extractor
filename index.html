@@ -6,39 +6,220 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>거상 이미지 Viewer</title>
     <style>
-        /* ...existing code... */
-        .image-container {
+        :root {
+            --bg: #15130f;
+            --surface: #201c16;
+            --surface-hover: #2a251d;
+            --border: #3c352a;
+            --border-soft: #2c271f;
+            --accent: #e0a83e;
+            --accent-dim: #8a6a2c;
+            --text: #f1ead9;
+            --text-muted: #a89a80;
+            --error: #e0664f;
+            --error-bg: #3a201a;
+            --font-display: Georgia, 'Nanum Myeongjo', 'Apple SD Gothic Neo', serif;
+            --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Noto Sans Mono CJK KR', monospace;
+        }
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #f6f1e6;
+                --surface: #ffffff;
+                --surface-hover: #f0e9d8;
+                --border: #ddd0b0;
+                --border-soft: #e8dfc7;
+                --accent: #a9711a;
+                --accent-dim: #c99a45;
+                --text: #2a2418;
+                --text-muted: #7a6e56;
+                --error: #b3392a;
+                --error-bg: #fbe6e1;
+            }
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            padding: 28px 32px 60px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-mono);
+            font-size: 14px;
+        }
+        h1 {
+            font-family: var(--font-display);
+            font-weight: 400;
+            font-size: 28px;
+            letter-spacing: 0.02em;
+            margin: 0 0 4px;
+            color: var(--text);
+        }
+        h1::after {
+            content: '';
+            display: block;
+            width: 48px;
+            height: 3px;
+            margin-top: 10px;
+            background: var(--accent);
+        }
+        #statusMessage {
+            min-height: 20px;
+            margin: 16px 0 20px;
+            padding: 0;
+            font-size: 13px;
+            color: var(--text-muted);
+            transition: color 0.15s ease;
+        }
+        #statusMessage:not(:empty) {
+            padding: 8px 14px;
+            border: 1px solid var(--border-soft);
+            border-left: 3px solid var(--accent-dim);
+            background: var(--surface);
+            border-radius: 3px;
+        }
+        #statusMessage.error {
+            color: var(--error);
+            border-left-color: var(--error);
+            background: var(--error-bg);
+        }
+        .toolbar {
             display: flex;
             flex-wrap: wrap;
+            align-items: center;
             gap: 10px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-soft);
+            margin-bottom: 24px;
+        }
+        input[type="file"] {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        input[type="file"]::file-selector-button {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            padding: 7px 14px;
+            margin-right: 10px;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        input[type="file"]::file-selector-button:hover {
+            border-color: var(--accent);
+            background: var(--surface-hover);
+        }
+        .toolbar-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border-soft);
+        }
+        .skip-blank-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+        }
+        .skip-blank-label input[type="checkbox"] {
+            accent-color: var(--accent);
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+        }
+        button {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            padding: 7px 14px;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+            transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+        }
+        button:hover:not(:disabled) {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        button:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+        #exportSelected, #exportAll {
+            background: transparent;
+            border-color: var(--accent-dim);
+        }
+        #exportSelected:hover:not(:disabled), #exportAll:hover:not(:disabled) {
+            background: var(--accent-dim);
+            color: var(--bg);
+            border-color: var(--accent-dim);
+        }
+        .image-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+            gap: 14px;
         }
         .image-item {
-            border: 1px solid black;
-            padding: 5px;
+            position: relative;
+            border: 1px solid var(--border-soft);
+            border-radius: 4px;
+            background: var(--surface);
+            padding: 10px;
             text-align: center;
+            transition: border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+        }
+        .image-item:hover {
+            border-color: var(--border);
+            transform: translateY(-2px);
         }
         .image-item:has(input[type="checkbox"]:checked) {
-            border-color: #1a73e8;
-            border-width: 2px;
-            background-color: #e8f0fe;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent), 0 4px 14px -4px var(--accent-dim);
+        }
+        .image-item input[type="checkbox"] {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 15px;
+            height: 15px;
+            accent-color: var(--accent);
+            cursor: pointer;
+            z-index: 1;
+        }
+        .image-item label {
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
         }
         .image-item img {
             display: block;
-            margin: 0 auto;
-        }
-        #statusMessage.error {
-            color: #b00020;
+            margin: 18px auto 0;
+            max-width: 100%;
         }
     </style>
 </head>
 <body>
     <h1>거상 이미지 Viewer</h1>
     <div id="statusMessage"></div>
-    <input type="file" id="fileInput" accept=".s32">
-    <label><input type="checkbox" id="skipBlankToggle" checked> 빈 이미지 건너뛰기</label>
-    <button id="selectAllToggle" disabled>전체 선택/해제</button>
-    <button id="exportSelected" disabled>선택한 이미지 내보내기</button>
-    <button id="exportAll" disabled>전체 내보내기</button>
+    <div class="toolbar">
+        <input type="file" id="fileInput" accept=".s32">
+        <div class="toolbar-divider"></div>
+        <label class="skip-blank-label"><input type="checkbox" id="skipBlankToggle" checked> 빈 이미지 건너뛰기</label>
+        <div class="toolbar-divider"></div>
+        <button id="selectAllToggle" disabled>전체 선택/해제</button>
+        <button id="exportSelected" disabled>선택한 이미지 내보내기</button>
+        <button id="exportAll" disabled>전체 내보내기</button>
+    </div>
     <div class="image-container" id="imageContainer"></div>
     <script>
         const fileInput = document.getElementById('fileInput');
