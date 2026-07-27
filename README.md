@@ -13,6 +13,7 @@ A single-page, no-build browser tool that extracts sprite frames from 거상(Ger
 - Loads `.S32` and `.AGF` sprite files and renders every frame as a thumbnail.
 - Auto-detects which format a file is (by its signature byte, not the extension).
 - "폴더 선택" — pick a whole folder and browse its `.agf`/`.s32` files (subfolders included) from a collapsible tree in the sidebar, instead of reopening the file picker for every file.
+- Search the sidebar by item name (not just filename) — see [Item-name search](#item-name-search) below.
 - Hides fully-transparent ("blank") frames by default — many sprite files have dozens of unused frame slots — with a toggle to show them.
 - Select individual frames (click anywhere on a thumbnail, or its checkbox), shift+click to select a range, or use "전체 선택/해제" to select all.
 - Export selected frames, or all frames, as PNGs (downloads are staggered so the browser doesn't block a burst of simultaneous downloads).
@@ -22,7 +23,7 @@ A single-page, no-build browser tool that extracts sprite frames from 거상(Ger
 
 There's no build step and no dependencies — one HTML file with an inline `<script>`. The pipeline for any file is:
 
-1. Read the file into an `ArrayBuffer` (`FileReader`).
+1. Read the file into an `ArrayBuffer` (`file.arrayBuffer()`).
 2. Read the 16-byte header to get the format signature, canvas width/height, and frame count.
 3. Dispatch on signature to the S32 or AGF reader, each of which returns the same shape: `{ width, height, frameCount, getFrame(i) }`. `getFrame(i)` decodes one frame on demand into an RGBA pixel buffer plus its position within the canvas.
 4. For each frame (skipping blanks if the toggle is on), paint the pixel buffer onto an offscreen `<canvas>` at the right position and get a PNG data URL from it.
@@ -113,6 +114,15 @@ Some sprite files are a grid of unrelated items (rings, gems, scrolls); others a
 - **Encoding happens on export**: "선택한 이미지 내보내기" builds the GIF from only the checked frames (erroring if none are checked); "전체 내보내기" always uses every currently-shown frame regardless of selection. Either way it runs a from-scratch GIF89a encoder (median-cut color quantization + LZW compression, written by hand — no external library) and downloads one `.gif` file instead of per-frame PNGs.
 - GIF is a hard 256-color format with binary (not partial) transparency, so this is lossy: colors are quantized to a shared palette (≤255 colors + 1 transparent index) across all frames, and pixels with alpha below 128 become fully transparent. Fine for pixel-art game sprites; not lossless.
 - Tested up to ~100 frames at 60×60 — encoding took well under a second.
+
+## Item-name search
+
+Filenames like `armor_01_I.AGF` don't tell you what the item actually is, and there's no such metadata inside `.agf`/`.s32` files themselves. The search box above the sidebar's folder tree matches against a community-maintained label catalog instead of raw filenames:
+
+- `labels.js` declares an empty registry; each cataloged item gets its own tiny file under `indexes/` (e.g. `indexes/armor_01_I.js` does `GERSANG_LABELS["armor_01_I.AGF"] = { "1": "ABC 갑옷" }`), loaded via its own `<script>` tag in `index.html`'s `<head>`. One small file per item — rather than one shared JSON blob — means adding an entry is a tiny diff with no merge-conflict risk when several people contribute via separate PRs.
+- There's no in-app editor. To add an entry: create `indexes/<something>.js` with the `GERSANG_LABELS[...] = {...}` line, add the matching `<script src="indexes/<something>.js"></script>` line in `index.html`'s `<head>`, and open a PR.
+- Search results are grouped by file, tagged `[인벤토리]`/`[필드]` from the `_I`/`_F` filename suffix convention (inventory icon vs. on-ground/field sprite — a naming convention, not something the file format encodes), with matching frame numbers and labels listed underneath. Unlabeled files still show up via plain filename substring matching — a frame just won't have a name line under it until someone labels it.
+- Clicking a frame result loads that file and scrolls to + briefly highlights the matching thumbnail.
 
 ## Sample files
 
