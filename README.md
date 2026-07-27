@@ -13,7 +13,7 @@ A single-page, no-build browser tool that extracts sprite frames from 거상(Ger
 - Hides fully-transparent ("blank") frames by default — many sprite files have dozens of unused frame slots — with a toggle to show them.
 - Select individual frames (click anywhere on a thumbnail, or its checkbox) or use "전체 선택/해제" to select all.
 - Export selected frames, or all frames, as PNGs (downloads are staggered so the browser doesn't block a burst of simultaneous downloads).
-- "애니메이션(GIF)로 보기" — for files that are actually an animation sequence (walk cycle, attack, etc.) rather than a grid of distinct items: shows a live preview by cycling through the shown frames, and exporting produces a single animated `.gif` instead of individual PNGs.
+- "애니메이션(GIF)로 보기" — for files that are actually an animation sequence (walk cycle, attack, etc.) rather than a grid of distinct items: shows a live preview by cycling through the shown (or selected) frames, and exporting produces a single animated `.gif` instead of individual PNGs.
 
 ## How it works
 
@@ -106,7 +106,8 @@ An earlier version of this tool had a second decode mode that misread `alpha` as
 Some sprite files are a grid of unrelated items (rings, gems, scrolls); others are frames of one animation (a character's walk cycle). "애니메이션(GIF)로 보기" is for the latter case.
 
 - **Preview is free**: checking the box just cycles `<img>`'s `src` through the same full-quality frame images already rendered for the thumbnail grid, on a 100ms interval. No encoding happens yet, so it's instant regardless of file size.
-- **Encoding happens on export**: clicking either export button while the toggle is on runs a from-scratch GIF89a encoder (median-cut color quantization + LZW compression, written by hand — no external library) and downloads one `.gif` file covering all the currently-shown frames, instead of per-frame PNGs.
+- **Select a sub-animation**: some AGF files bundle multiple animations (idle, walk, attack, ...) as one long frame sequence. Check specific frames and the preview switches to cycling just those, in order — useful for isolating one animation out of a bundle before exporting.
+- **Encoding happens on export**: "선택한 이미지 내보내기" builds the GIF from only the checked frames (erroring if none are checked); "전체 내보내기" always uses every currently-shown frame regardless of selection. Either way it runs a from-scratch GIF89a encoder (median-cut color quantization + LZW compression, written by hand — no external library) and downloads one `.gif` file instead of per-frame PNGs.
 - GIF is a hard 256-color format with binary (not partial) transparency, so this is lossy: colors are quantized to a shared palette (≤255 colors + 1 transparent index) across all frames, and pixels with alpha below 128 become fully transparent. Fine for pixel-art game sprites; not lossless.
 - Tested up to ~100 frames at 60×60 — encoding took well under a second.
 

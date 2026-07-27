@@ -283,14 +283,44 @@
         const GIF_PREVIEW_INTERVAL_MS = 100;
         const GIF_FRAME_DELAY_CS = 10; // 100ms per frame, matches the preview's pace
 
-        function startGifPreview() {
+        // `.image-item`s are rendered in the same order currentAnimationFrames /
+        // currentAnimationFrameDataUrls were built in, so a checkbox's DOM position
+        // is directly usable as an index into either array.
+        function getSelectedFrameIndices() {
+            const checkboxes = Array.from(document.querySelectorAll('.image-item input[type="checkbox"]'));
+            const indices = [];
+            checkboxes.forEach((cb, idx) => { if (cb.checked) indices.push(idx); });
+            return indices;
+        }
+
+        // Some AGF files bundle multiple animations (idle, walk, attack, ...) as one
+        // frame sequence. Selecting specific frames lets the user build a GIF from
+        // just one of those sub-animations; with nothing selected, the preview (and
+        // "전체 내보내기") falls back to every currently-shown frame.
+        function updateGifPreviewForSelection() {
+            if (!currentAnimationFrameDataUrls || currentAnimationFrameDataUrls.length === 0) {
+                stopGifPreview();
+                return;
+            }
+            const selected = getSelectedFrameIndices();
+            const dataUrls = selected.length > 0
+                ? selected.map(idx => currentAnimationFrameDataUrls[idx])
+                : currentAnimationFrameDataUrls;
+            startGifPreview(dataUrls, selected.length > 0);
+        }
+
+        function startGifPreview(dataUrls, isSelection) {
+            stopGifPreview();
             gifPreviewContainer.style.display = 'block';
-            gifPreviewCaption.textContent = `애니메이션 미리보기 - ${currentAnimationFrameDataUrls.length}프레임 (내보내기 시 GIF로 저장됩니다)`;
+            const label = isSelection
+                ? `선택한 ${dataUrls.length}개 프레임 미리보기`
+                : `전체 ${dataUrls.length}프레임 미리보기`;
+            gifPreviewCaption.textContent = `${label} (내보내기 시 GIF로 저장됩니다)`;
             let frameIndex = 0;
-            gifPreviewImage.src = currentAnimationFrameDataUrls[0];
+            gifPreviewImage.src = dataUrls[0];
             gifPreviewIntervalId = setInterval(() => {
-                frameIndex = (frameIndex + 1) % currentAnimationFrameDataUrls.length;
-                gifPreviewImage.src = currentAnimationFrameDataUrls[frameIndex];
+                frameIndex = (frameIndex + 1) % dataUrls.length;
+                gifPreviewImage.src = dataUrls[frameIndex];
             }, GIF_PREVIEW_INTERVAL_MS);
         }
 
@@ -307,6 +337,9 @@
             const checkboxes = document.querySelectorAll('.image-item input[type="checkbox"]');
             const allChecked = Array.from(checkboxes).every(cb => cb.checked);
             checkboxes.forEach(cb => { cb.checked = !allChecked; });
+            if (animationModeToggle.checked) {
+                updateGifPreviewForSelection();
+            }
         }
 
         let currentFileName = '';
@@ -546,8 +579,8 @@
                     currentAnimationFrameDataUrls = animationFrameDataUrls;
                     currentAnimationWidth = sprite.width;
                     currentAnimationHeight = sprite.height;
-                    startGifPreview();
-                    statusExtra = ` / 애니메이션 미리보기 ${animationFrames.length}프레임 (내보내기 시 GIF로 저장)`;
+                    updateGifPreviewForSelection();
+                    statusExtra = ` / 애니메이션 미리보기 ${animationFrames.length}프레임 (이미지를 선택하면 선택한 프레임만으로 GIF를 만들 수 있습니다)`;
                 } else if (wantAnimationFrames) {
                     statusExtra = ' / 애니메이션으로 표시할 프레임이 없습니다';
                 }
@@ -640,9 +673,17 @@
             const checkbox = div.querySelector('input[type="checkbox"]');
             div.addEventListener('click', (event) => {
                 if (event.target === checkbox || event.target.tagName === 'LABEL') {
-                    return;
+                    return; // native checkbox/label click already toggles + fires 'change'
                 }
                 checkbox.checked = !checkbox.checked;
+                if (animationModeToggle.checked) {
+                    updateGifPreviewForSelection();
+                }
+            });
+            checkbox.addEventListener('change', () => {
+                if (animationModeToggle.checked) {
+                    updateGifPreviewForSelection();
+                }
             });
             imageContainer.appendChild(div);
         }
@@ -651,7 +692,7 @@
 
         function exportSelectedImages() {
             if (animationModeToggle.checked) {
-                exportAnimationAsGif();
+                exportAnimationAsGif(true);
                 return;
             }
             const checkboxes = document.querySelectorAll('.image-item input[type="checkbox"]:checked');
@@ -663,7 +704,7 @@
 
         function exportAllImages() {
             if (animationModeToggle.checked) {
-                exportAnimationAsGif();
+                exportAnimationAsGif(false);
                 return;
             }
             const images = document.querySelectorAll('.image-item img');
@@ -684,17 +725,33 @@
         // Builds an actual GIF only when the user exports — the live preview above
         // just cycles the original (full-quality, non-palette-quantized) frame
         // images, so this is the one place GIF-specific lossy encoding happens.
-        async function exportAnimationAsGif() {
+        //
+        // Some AGF files bundle multiple animations (idle, walk, attack, ...) as one
+        // frame sequence — when `useSelection` is true (선택한 이미지 내보내기), only
+        // the checked frames go into the GIF, in their original frame order; when
+        // false (전체 내보내기), every currently-shown frame is used.
+        async function exportAnimationAsGif(useSelection) {
             if (!currentAnimationFrames || currentAnimationFrames.length === 0) {
                 showError('GIF로 내보낼 프레임이 없습니다.');
                 return;
             }
-            const frameCount = currentAnimationFrames.length;
+
+            let frames = currentAnimationFrames;
+            if (useSelection) {
+                const selected = getSelectedFrameIndices();
+                if (selected.length === 0) {
+                    showError('선택된 이미지가 없습니다. 이미지를 선택하거나 "전체 내보내기"를 사용하세요.');
+                    return;
+                }
+                frames = selected.map(idx => currentAnimationFrames[idx]);
+            }
+
+            const frameCount = frames.length;
             showInfo(`${currentFileName} - GIF 생성 중... (${frameCount}프레임)`);
             await new Promise(resolve => setTimeout(resolve, 0)); // let the status message paint before the synchronous encode
 
             try {
-                const gifBytes = encodeAnimatedGif(currentAnimationFrames, currentAnimationWidth, currentAnimationHeight, GIF_FRAME_DELAY_CS);
+                const gifBytes = encodeAnimatedGif(frames, currentAnimationWidth, currentAnimationHeight, GIF_FRAME_DELAY_CS);
                 const blob = new Blob([gifBytes], { type: 'image/gif' });
                 const url = URL.createObjectURL(blob);
                 const baseName = (currentFileName || 'animation').replace(/\.(s32|agf)$/i, '');
