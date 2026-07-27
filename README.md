@@ -121,6 +121,10 @@ Some sprite files are a grid of unrelated items (rings, gems, scrolls); others a
 
 No build step, no package manager. Open `index.html` directly in a browser to run it. See `CLAUDE.md` for guidance aimed at AI coding agents working in this repo.
 
+## Author
+
+현무 서버 !무쌍거상! (자동, 자동마저, 자동타저)
+
 ## Questions / Contact
 
 - In-game (거상, 현무 서버): 자동, 자동마저, 자동타저
