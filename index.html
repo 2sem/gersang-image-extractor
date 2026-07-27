@@ -40,9 +40,16 @@
         const exportAllButton = document.getElementById('exportAll');
         const statusMessage = document.getElementById('statusMessage');
 
+        let currentFileName = '';
+
         function showError(message) {
             statusMessage.textContent = message;
             statusMessage.classList.add('error');
+        }
+
+        function showInfo(message) {
+            statusMessage.textContent = message;
+            statusMessage.classList.remove('error');
         }
 
         function clearStatus() {
@@ -65,6 +72,9 @@
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
+
+            currentFileName = file.name;
+            showInfo(`${file.name} 불러오는 중...`);
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -127,11 +137,12 @@
 
                 exportSelectedButton.disabled = imageCount === 0;
                 exportAllButton.disabled = imageCount === 0;
+                showInfo(`${currentFileName} - 이미지 ${imageCount}개 로드 완료`);
                 console.log(`[Log] S32 파일에서 이미지 추출 완료, 추출된 이미지 개수: ${imageCount}`);
             } catch (err) {
                 console.error('[Log] S32 파일 파싱 오류:', err);
                 imageContainer.innerHTML = '';
-                showError(err.message || '파일을 읽는 중 오류가 발생했습니다.');
+                showError(`${currentFileName}: ${err.message || '파일을 읽는 중 오류가 발생했습니다.'}`);
             }
         }
 
