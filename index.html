@@ -60,6 +60,7 @@
         }
 
         function parseS32File(buffer) {
+            imageContainer.innerHTML = '';
             const dataView = new DataView(buffer);
             console.log("[Log] 파일 종류:", dataView.getUint32(0, true));
             console.log("[Log] 이미지 넓이:", dataView.getUint32(4, true));
@@ -105,7 +106,7 @@
 
             for (let i = 0; i < count; i++) {
                 const type = dataView.getUint8(start + i * 4);
-                const hexValue = Array.from({ length: 4 }, (_, j) => 
+                const hexValue = Array.from({ length: 4 }, (_, j) =>
                     dataView.getUint8(start + i * 4 + j).toString(16).padStart(2, '0')
                 ).join(' ');
                 console.log(`[Log] ${i + 1}번째 픽셀 Hex: ${hexValue}`);
