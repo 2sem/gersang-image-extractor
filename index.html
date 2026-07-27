@@ -174,18 +174,20 @@
             imageContainer.appendChild(div);
         }
 
+        const DOWNLOAD_INTERVAL_MS = 300;
+
         function exportSelectedImages() {
             const checkboxes = document.querySelectorAll('.image-item input[type="checkbox"]:checked');
             checkboxes.forEach((checkbox, index) => {
                 const img = checkbox.parentElement.querySelector('img');
-                downloadImage(img.src, `image_${index + 1}.png`);
+                setTimeout(() => downloadImage(img.src, `image_${index + 1}.png`), index * DOWNLOAD_INTERVAL_MS);
             });
         }
 
         function exportAllImages() {
             const images = document.querySelectorAll('.image-item img');
             images.forEach((img, index) => {
-                downloadImage(img.src, `image_${index + 1}.png`);
+                setTimeout(() => downloadImage(img.src, `image_${index + 1}.png`), index * DOWNLOAD_INTERVAL_MS);
             });
         }
 
