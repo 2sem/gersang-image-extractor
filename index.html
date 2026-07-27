@@ -367,8 +367,8 @@
         }
     </style>
     <script src="labels.js"></script>
-    <!-- One <script> per cataloged item — see labels.js for how to add an entry. -->
-    <script src="indexes/armor_01_I.js"></script>
+    <!-- Generated from indexes/**/*.js by scripts/build-indexes.py — don't edit by hand. -->
+    <script src="indexes.js"></script>
 </head>
 <body>
     <div class="app-shell">
@@ -581,6 +581,8 @@
         // fetch()) — it is not tied to any locally picked file/folder, and entries
         // are not clickable. It just tells the user which file (and frame) to
         // go open via the "파일 선택" picker above; there is no "load on click" here.
+        //
+        // Each catalog entry is { name: "<friendly file name>", items: { "<frameIndex>": "<name>" } }.
         function renderLabelGuide(query) {
             const catalog = typeof GERSANG_LABELS !== 'undefined' ? GERSANG_LABELS : {};
             const q = query.trim().toLowerCase();
@@ -588,13 +590,19 @@
 
             const rows = [];
             for (const filename of filenames) {
-                const frameEntries = Object.entries(catalog[filename]);
-                const matchedFrames = q
-                    ? frameEntries.filter(([, label]) => label.toLowerCase().includes(q))
-                    : frameEntries;
-                const filenameMatches = !q || filename.toLowerCase().includes(q);
-                if (q && matchedFrames.length === 0 && !filenameMatches) continue;
-                rows.push({ filename, badge: getFileTypeBadge(filename), frames: q ? matchedFrames : frameEntries });
+                const entry = catalog[filename] || {};
+                const displayName = entry.name || '';
+                const itemEntries = Object.entries(entry.items || {});
+                const matchedItems = q
+                    ? itemEntries.filter(([, label]) => label.toLowerCase().includes(q))
+                    : itemEntries;
+                const fileMatches = !q || filename.toLowerCase().includes(q) || displayName.toLowerCase().includes(q);
+                if (q && matchedItems.length === 0 && !fileMatches) continue;
+                // Matched via item content -> show just those items (precise search).
+                // Matched only via filename/display name (or no query at all) -> show
+                // every item in the file, for full context.
+                const itemsToShow = matchedItems.length > 0 ? matchedItems : itemEntries;
+                rows.push({ filename, displayName, badge: getFileTypeBadge(filename), items: itemsToShow });
             }
 
             fileTree.innerHTML = '';
@@ -609,10 +617,11 @@
             for (const row of rows) {
                 const fileRow = document.createElement('div');
                 fileRow.className = 'guide-file';
-                fileRow.innerHTML = `<span>${row.filename}</span>` + (row.badge ? ` <span class="tree-badge">[${row.badge}]</span>` : '');
+                const nameSuffix = row.displayName ? ` - ${row.displayName}` : '';
+                fileRow.innerHTML = `<span>${row.filename}${nameSuffix}</span>` + (row.badge ? ` <span class="tree-badge">[${row.badge}]</span>` : '');
                 fileTree.appendChild(fileRow);
 
-                for (const [frameIndex, label] of row.frames) {
+                for (const [frameIndex, label] of row.items) {
                     const frameRow = document.createElement('div');
                     frameRow.className = 'guide-frame';
                     frameRow.textContent = `- ${frameIndex}: ${label}`;
