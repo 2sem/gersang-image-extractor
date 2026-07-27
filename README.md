@@ -2,7 +2,7 @@
 
 A single-page, no-build browser tool that extracts sprite frames from 거상(Gersang)'s `.S32` and `.AGF` asset files and exports them as PNGs. Everything runs client-side — pick a file, it decodes and renders in the browser, no server involved.
 
-Live at GitHub Pages: `index.html` is the entry point.
+**Live:** https://2sem.github.io/gersang-image-extractor/ (GitHub Pages, `index.html` is the entry point).
 
 ![거상 이미지 Viewer showing ring01_i.AGF loaded, 17 non-blank frames out of 100 displayed](docs/screenshot.png)
 
