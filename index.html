@@ -21,10 +21,14 @@
             display: block;
             margin: 0 auto;
         }
+        #statusMessage.error {
+            color: #b00020;
+        }
     </style>
 </head>
 <body>
     <h1>거상 이미지 Viewer</h1>
+    <div id="statusMessage"></div>
     <input type="file" id="fileInput" accept=".s32">
     <button id="exportSelected" disabled>선택한 이미지 내보내기</button>
     <button id="exportAll" disabled>전체 내보내기</button>
@@ -34,6 +38,17 @@
         const imageContainer = document.getElementById('imageContainer');
         const exportSelectedButton = document.getElementById('exportSelected');
         const exportAllButton = document.getElementById('exportAll');
+        const statusMessage = document.getElementById('statusMessage');
+
+        function showError(message) {
+            statusMessage.textContent = message;
+            statusMessage.classList.add('error');
+        }
+
+        function clearStatus() {
+            statusMessage.textContent = '';
+            statusMessage.classList.remove('error');
+        }
 
         fileInput.addEventListener('change', handleFileSelect);
         exportSelectedButton.addEventListener('click', exportSelectedImages);
@@ -63,40 +78,61 @@
             imageContainer.innerHTML = '';
             exportSelectedButton.disabled = true;
             exportAllButton.disabled = true;
-            const dataView = new DataView(buffer);
-            console.log("[Log] 파일 종류:", dataView.getUint32(0, true));
-            console.log("[Log] 이미지 넓이:", dataView.getUint32(4, true));
-            console.log("[Log] 이미지 높이:", dataView.getUint32(8, true));
-            const imageCount = dataView.getUint32(12, true);
-            console.log("[Log] 압축된 이미지 수:", imageCount);
+            clearStatus();
 
-            const width = dataView.getUint32(4, true);
-            const height = dataView.getUint32(8, true);
+            try {
+                if (buffer.byteLength < 2416) {
+                    throw new Error('파일이 너무 작습니다. 올바른 S32 파일이 아닙니다.');
+                }
 
-            const startPositions = [];
-            const compressedPixelCounts = [];
-            for (let i = 0; i < imageCount; i++) {
-                startPositions.push(dataView.getUint32(1216 + i * 4, true) + 3660);
-                compressedPixelCounts.push(dataView.getUint32(2416 + i * 4, true));
+                const dataView = new DataView(buffer);
+                console.log("[Log] 파일 종류:", dataView.getUint32(0, true));
+                console.log("[Log] 이미지 넓이:", dataView.getUint32(4, true));
+                console.log("[Log] 이미지 높이:", dataView.getUint32(8, true));
+                const imageCount = dataView.getUint32(12, true);
+                console.log("[Log] 압축된 이미지 수:", imageCount);
+
+                const width = dataView.getUint32(4, true);
+                const height = dataView.getUint32(8, true);
+
+                if (width === 0 || height === 0) {
+                    throw new Error('이미지 크기 정보가 올바르지 않습니다. 올바른 S32 파일이 아닙니다.');
+                }
+
+                const tableEnd = Math.max(1216 + imageCount * 4, 2416 + imageCount * 4);
+                if (imageCount < 0 || buffer.byteLength < tableEnd) {
+                    throw new Error('이미지 개수 정보가 올바르지 않습니다. 올바른 S32 파일이 아닙니다.');
+                }
+
+                const startPositions = [];
+                const compressedPixelCounts = [];
+                for (let i = 0; i < imageCount; i++) {
+                    startPositions.push(dataView.getUint32(1216 + i * 4, true) + 3660);
+                    compressedPixelCounts.push(dataView.getUint32(2416 + i * 4, true));
+                }
+
+                for (let i = 0; i < imageCount; i++) {
+                    const imageStart = startPositions[i];
+                    const compressedPixelCount = compressedPixelCounts[i];
+                    console.log(`[Log] ${i + 1}번째 이미지 시작 위치: ${imageStart}`);
+                    console.log(`[Log] ${i + 1}번째 이미지 압축된 픽셀 수: ${compressedPixelCount}`);
+
+                    console.log(`[Log] ${i + 1}번째 이미지 추출 시작`);
+                    const decompressedPixels = decompressPixels(dataView, imageStart, compressedPixelCount, width, height);
+                    console.log(`[Log] ${i + 1}번째 이미지 압축 해제된 픽셀 수: ${decompressedPixels.length / 4}`);
+                    const imageData = createImageData(decompressedPixels, width, height);
+                    console.log(`[Log] ${i + 1}번째 이미지 추출 완료`);
+                    addImageToContainer(i + 1, imageData);
+                }
+
+                exportSelectedButton.disabled = imageCount === 0;
+                exportAllButton.disabled = imageCount === 0;
+                console.log(`[Log] S32 파일에서 이미지 추출 완료, 추출된 이미지 개수: ${imageCount}`);
+            } catch (err) {
+                console.error('[Log] S32 파일 파싱 오류:', err);
+                imageContainer.innerHTML = '';
+                showError(err.message || '파일을 읽는 중 오류가 발생했습니다.');
             }
-
-            for (let i = 0; i < imageCount; i++) {
-                const imageStart = startPositions[i];
-                const compressedPixelCount = compressedPixelCounts[i];
-                console.log(`[Log] ${i + 1}번째 이미지 시작 위치: ${imageStart}`);
-                console.log(`[Log] ${i + 1}번째 이미지 압축된 픽셀 수: ${compressedPixelCount}`);
-
-                console.log(`[Log] ${i + 1}번째 이미지 추출 시작`);
-                const decompressedPixels = decompressPixels(dataView, imageStart, compressedPixelCount, width, height);
-                console.log(`[Log] ${i + 1}번째 이미지 압축 해제된 픽셀 수: ${decompressedPixels.length / 4}`);
-                const imageData = createImageData(decompressedPixels, width, height);
-                console.log(`[Log] ${i + 1}번째 이미지 추출 완료`);
-                addImageToContainer(i + 1, imageData);
-            }
-
-            exportSelectedButton.disabled = imageCount === 0;
-            exportAllButton.disabled = imageCount === 0;
-            console.log(`[Log] S32 파일에서 이미지 추출 완료, 추출된 이미지 개수: ${imageCount}`);
         }
 
         function decompressPixels(dataView, start, count, width, height) {
