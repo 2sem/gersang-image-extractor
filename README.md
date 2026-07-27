@@ -109,3 +109,11 @@ An earlier version of this tool had a second decode mode that misread `alpha` as
 ## Development
 
 No build step, no package manager. Open `index.html` directly in a browser to run it. See `CLAUDE.md` for guidance aimed at AI coding agents working in this repo.
+
+## Questions / Contact
+
+- In-game (거상, 현무 서버): 자동, 자동마저, 자동타저
+- KakaoTalk open chat "게임도우미": https://open.kakao.com/o/g2o1jY9d
+
+  <img src="docs/kakao-qr.jpeg" alt="게임도우미 KakaoTalk open chat QR code" width="200">
+
