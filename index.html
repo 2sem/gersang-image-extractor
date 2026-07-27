@@ -130,6 +130,28 @@
             color: var(--text-muted);
             white-space: nowrap;
         }
+        .guide-folder {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 6px;
+            font-weight: bold;
+            color: var(--text);
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+        }
+        .guide-folder-toggle {
+            display: inline-block;
+            width: 1em;
+            color: var(--text-muted);
+        }
+        .guide-folder-children {
+            padding-left: 14px;
+        }
+        .guide-folder-children.collapsed {
+            display: none;
+        }
         .sidebar-toggle {
             flex-shrink: 0;
             width: 18px;
@@ -577,12 +599,16 @@
         }
 
         // The sidebar is a static reference guide built directly from GERSANG_LABELS
-        // (labels.js plus indexes/*.js, script-tag loaded — see labels.js for why not
-        // fetch()) — it is not tied to any locally picked file/folder, and entries
-        // are not clickable. It just tells the user which file (and frame) to
+        // (labels.js plus the generated indexes.js, script-tag loaded — see labels.js
+        // for why not fetch()) — it is not tied to any locally picked file/folder, and
+        // entries are not clickable. It just tells the user which file (and frame) to
         // go open via the "파일 선택" picker above; there is no "load on click" here.
         //
-        // Each catalog entry is { name: "<friendly file name>", items: { "<frameIndex>": "<name>" } }.
+        // Each catalog entry is:
+        //   { name: "<friendly file name>", items: { "<frameIndex>": "<name>" },
+        //     folder: "<indexes/-relative folder path>" }
+        // `folder` is set automatically by scripts/build-indexes.py from where the
+        // source file lives under indexes/ — contributors never set it themselves.
         function renderLabelGuide(query) {
             const catalog = typeof GERSANG_LABELS !== 'undefined' ? GERSANG_LABELS : {};
             const q = query.trim().toLowerCase();
@@ -602,7 +628,7 @@
                 // Matched only via filename/display name (or no query at all) -> show
                 // every item in the file, for full context.
                 const itemsToShow = matchedItems.length > 0 ? matchedItems : itemEntries;
-                rows.push({ filename, displayName, badge: getFileTypeBadge(filename), items: itemsToShow });
+                rows.push({ filename, displayName, badge: getFileTypeBadge(filename), items: itemsToShow, folder: entry.folder || '' });
             }
 
             fileTree.innerHTML = '';
@@ -614,20 +640,80 @@
                 return;
             }
 
-            for (const row of rows) {
-                const fileRow = document.createElement('div');
-                fileRow.className = 'guide-file';
-                const nameSuffix = row.displayName ? ` - ${row.displayName}` : '';
-                fileRow.innerHTML = `<span>${row.filename}${nameSuffix}</span>` + (row.badge ? ` <span class="tree-badge">[${row.badge}]</span>` : '');
-                fileTree.appendChild(fileRow);
+            // Group by folder, mirroring how indexes/ is organized, so the guide
+            // always reads as a tree — including search results, so a match still
+            // shows which parent folders it lives under.
+            fileTree.appendChild(renderGuideGroup(groupGuideRowsByFolder(rows)));
+        }
 
-                for (const [frameIndex, label] of row.items) {
-                    const frameRow = document.createElement('div');
-                    frameRow.className = 'guide-frame';
-                    frameRow.textContent = `- ${frameIndex}: ${label}`;
-                    fileTree.appendChild(frameRow);
+        function groupGuideRowsByFolder(rows) {
+            const root = { folders: {}, files: [] };
+            for (const row of rows) {
+                if (!row.folder) {
+                    root.files.push(row);
+                    continue;
                 }
+                let node = root;
+                for (const part of row.folder.split('/')) {
+                    node.folders[part] = node.folders[part] || { folders: {}, files: [] };
+                    node = node.folders[part];
+                }
+                node.files.push(row);
             }
+            return root;
+        }
+
+        function renderGuideGroup(node) {
+            const fragment = document.createDocumentFragment();
+            for (const name of Object.keys(node.folders).sort()) {
+                fragment.appendChild(buildGuideFolderNode(name, node.folders[name]));
+            }
+            for (const row of node.files.slice().sort((a, b) => a.filename.localeCompare(b.filename))) {
+                fragment.appendChild(buildGuideFileNode(row));
+            }
+            return fragment;
+        }
+
+        // Purely an expand/collapse toggle for display grouping — not click-to-load,
+        // unlike the old picked-folder browser this replaced.
+        function buildGuideFolderNode(label, node) {
+            const wrapper = document.createElement('div');
+
+            const header = document.createElement('div');
+            header.className = 'guide-folder';
+            header.innerHTML = `<span class="guide-folder-toggle">▾</span><span>${label}</span>`;
+
+            const childrenEl = document.createElement('div');
+            childrenEl.className = 'guide-folder-children';
+            childrenEl.appendChild(renderGuideGroup(node));
+
+            header.addEventListener('click', () => {
+                childrenEl.classList.toggle('collapsed');
+                header.querySelector('.guide-folder-toggle').textContent = childrenEl.classList.contains('collapsed') ? '▸' : '▾';
+            });
+
+            wrapper.appendChild(header);
+            wrapper.appendChild(childrenEl);
+            return wrapper;
+        }
+
+        function buildGuideFileNode(row) {
+            const wrapper = document.createElement('div');
+
+            const fileRow = document.createElement('div');
+            fileRow.className = 'guide-file';
+            const nameSuffix = row.displayName ? ` - ${row.displayName}` : '';
+            fileRow.innerHTML = `<span>${row.filename}${nameSuffix}</span>` + (row.badge ? ` <span class="tree-badge">[${row.badge}]</span>` : '');
+            wrapper.appendChild(fileRow);
+
+            for (const [frameIndex, label] of row.items) {
+                const frameRow = document.createElement('div');
+                frameRow.className = 'guide-frame';
+                frameRow.textContent = `- ${frameIndex}: ${label}`;
+                wrapper.appendChild(frameRow);
+            }
+
+            return wrapper;
         }
 
         treeSearchInput.addEventListener('input', () => renderLabelGuide(treeSearchInput.value));

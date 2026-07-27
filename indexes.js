@@ -9,4 +9,5 @@ GERSANG_LABELS["dress02_i.AGF"] = {
         "23": "츠쿠요미 의복"
     }
 };
+GERSANG_LABELS["dress02_i.AGF"].folder = "Textures/Items";
 

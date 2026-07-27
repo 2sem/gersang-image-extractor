@@ -33,7 +33,11 @@
 //        };
 //      Frame index is the same 1-based number shown under each thumbnail. Only add
 //      a frame once you actually know what it is — unlabeled frames simply won't
-//      show up, which is expected and fine. `name` is optional.
+//      show up, which is expected and fine. `name` is optional. The path you choose
+//      under indexes/ (e.g. indexes/Textures/Items/dress02_i.js) also becomes this
+//      entry's `.folder`, which the sidebar uses to group the guide into a tree —
+//      build-indexes.py derives and appends that automatically, so don't set
+//      `.folder` yourself.
 //   2. Run `python3 scripts/build-indexes.py` to regenerate indexes.js.
 //   3. Commit both the new file under indexes/ and the regenerated indexes.js.
 const GERSANG_LABELS = {};

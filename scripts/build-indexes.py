@@ -7,16 +7,26 @@ low-conflict diffs (see labels.js), while the page itself only ever needs one
 fixed <script src="indexes.js"> tag - no manifest to maintain, no index.html
 edit, no per-file <script> tag, regardless of how many items get cataloged.
 
+The folder each file lives under (relative to indexes/) is meaningful organization
+- e.g. indexes/Textures/Items/dress02_i.js - so after inlining each file's own
+GERSANG_LABELS["..."] = {...} assignment(s), this script appends a line setting
+.folder on every key that file assigned, letting index.html group the sidebar
+guide into a folder tree without contributors having to declare that themselves.
+
 Run this after adding or editing any file under indexes/, then commit both the
 edited source file and the regenerated indexes.js.
 
 Usage: python3 scripts/build-indexes.py
 """
+import json
 import pathlib
+import re
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 INDEXES_DIR = REPO_ROOT / "indexes"
 OUTPUT_FILE = REPO_ROOT / "indexes.js"
+
+ASSIGNMENT_KEY_RE = re.compile(r'GERSANG_LABELS\[\s*["\']([^"\']+)["\']\s*\]\s*=')
 
 
 def main():
@@ -28,9 +38,17 @@ def main():
         "",
     ]
     for path in js_files:
-        rel = path.relative_to(INDEXES_DIR).as_posix()
-        parts.append(f"// ---- indexes/{rel} ----")
-        parts.append(path.read_text(encoding="utf-8").rstrip())
+        rel = path.relative_to(INDEXES_DIR)
+        rel_dir = rel.parent.as_posix()
+        if rel_dir == ".":
+            rel_dir = ""
+
+        content = path.read_text(encoding="utf-8").rstrip()
+        parts.append(f"// ---- indexes/{rel.as_posix()} ----")
+        parts.append(content)
+
+        for key in ASSIGNMENT_KEY_RE.findall(content):
+            parts.append(f"GERSANG_LABELS[{json.dumps(key)}].folder = {json.dumps(rel_dir)};")
         parts.append("")
 
     OUTPUT_FILE.write_text("\n".join(parts) + "\n", encoding="utf-8")
