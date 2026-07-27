@@ -213,7 +213,7 @@
     <h1>거상 이미지 Viewer</h1>
     <div id="statusMessage"></div>
     <div class="toolbar">
-        <input type="file" id="fileInput" accept=".s32">
+        <input type="file" id="fileInput" accept=".s32,.agf">
         <div class="toolbar-divider"></div>
         <label class="skip-blank-label"><input type="checkbox" id="skipBlankToggle" checked> 빈 이미지 건너뛰기</label>
         <div class="toolbar-divider"></div>
@@ -262,7 +262,7 @@
         selectAllToggleButton.addEventListener('click', toggleSelectAll);
         skipBlankToggle.addEventListener('change', () => {
             if (currentBuffer) {
-                parseS32File(currentBuffer);
+                parseSpriteFile(currentBuffer);
             }
         });
 
@@ -276,41 +276,136 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 currentBuffer = e.target.result;
-                parseS32File(currentBuffer);
+                parseSpriteFile(currentBuffer);
             };
             reader.readAsArrayBuffer(file);
         }
 
-        // S32 sprite format, as used by 거상(Gersang)'s client — 32-bit color with an
-        // alpha channel (there are sibling variants: signature 0x0F is 32-bit without
-        // alpha, 0x09 is an 8-bit palette sprite; this tool only reads the alpha variant).
+        // 거상(Gersang) sprite container family. Both formats share a 16-byte header
+        // (u32 signature, u32 width, u32 height, u32 frameCount) and a frame-offset
+        // table at the same fixed offset 0x4c0 (1216) — AGF is the newer replacement
+        // for S32, adding a per-frame trim box and whole-region zlib compression.
         // Layout cross-checked against the independent reference decoder at
-        // https://github.com/hallazzang/gosang (sprite32alpha.go).
-        //
-        //   offset 0            : header — u32 signature, u32 width, u32 height, u32 frameCount
-        //   offset 0x4c0 (1216) : u32[frameCount] frame data offset, relative to FRAME_DATA_BASE
+        // https://github.com/hallazzang/gosang (sprite32alpha.go) for the S32 side;
+        // the AGF side was reverse-engineered directly against real client assets.
+        const FRAME_OFFSETS_OFFSET = 1216; // 0x4c0 — shared by both formats
+
+        // S32 — 32-bit color with alpha (sibling variants 0x0F no-alpha, 0x09 8-bit
+        // palette exist but aren't supported).
         //   offset 0x970 (2416) : u32[frameCount] frame pixel-op record count
-        //   offset 0xe4c (3660) : frame pixel-op streams begin here
-        //
-        // Both tables reserve a fixed 1200-byte block (up to 300 frames) regardless of
-        // the actual frameCount, which is why the two table offsets are fixed constants
-        // rather than derived from frameCount.
+        //   offset 0xe4c (3660) : frame pixel-op streams begin here (uncompressed)
+        // Both tables reserve a fixed 1200-byte block (up to 300 frames) regardless
+        // of the actual frameCount, which is why offsets are fixed constants rather
+        // than derived from frameCount.
         const S32_SIGNATURE_ALPHA32 = 25; // 0x19
-        const S32_FRAME_OFFSETS_OFFSET = 1216; // 0x4c0
         const S32_FRAME_RECORD_COUNTS_OFFSET = 2416; // 0x970
         const S32_FRAME_DATA_BASE = 3660; // 0xe4c
 
-        function readFrameTable(dataView, frameCount) {
+        // AGF — same per-frame pixel-op format as S32, but each frame is trimmed to
+        // a bounding box within the canvas, and the *entire* frame-data region (all
+        // frames concatenated, addressed the same way S32 addresses it) is stored as
+        // a single zlib stream.
+        //   offset 2416 : { u16 x, u16 y, u16 w, u16 h }[frameCount] — per-frame trim box
+        //   right after that table: a 48-byte trailer —
+        //     u32 decompressedSize, u32 w*10, u32 h*10, u32 0, u32 w, u32 h,
+        //     u32 w*10, u32 h*10, u32 0, u32 0, u32 flag, u32 compressedSize
+        //   then the zlib stream itself, `compressedSize` bytes long
+        const AGF_SIGNATURE = 35; // 0x23
+        const AGF_FRAME_BBOX_OFFSET = 2416; // coincides with S32's offset, different meaning
+        const AGF_TRAILER_SIZE = 48;
+
+        // Reads an S32 sprite's header-described frames without any decompression —
+        // pixel-op data sits uncompressed at a fixed offset in the file.
+        function readS32Sprite(dataView, buffer, width, height, frameCount) {
+            if (buffer.byteLength < S32_FRAME_RECORD_COUNTS_OFFSET) {
+                throw new Error('파일이 너무 작습니다. 올바른 S32 파일이 아닙니다.');
+            }
+            const tableEnd = Math.max(
+                FRAME_OFFSETS_OFFSET + frameCount * 4,
+                S32_FRAME_RECORD_COUNTS_OFFSET + frameCount * 4
+            );
+            if (frameCount < 0 || buffer.byteLength < tableEnd) {
+                throw new Error('이미지 개수 정보가 올바르지 않습니다. 올바른 S32 파일이 아닙니다.');
+            }
+
             const offsets = [];
             const recordCounts = [];
             for (let i = 0; i < frameCount; i++) {
-                offsets.push(dataView.getUint32(S32_FRAME_OFFSETS_OFFSET + i * 4, true) + S32_FRAME_DATA_BASE);
+                offsets.push(dataView.getUint32(FRAME_OFFSETS_OFFSET + i * 4, true) + S32_FRAME_DATA_BASE);
                 recordCounts.push(dataView.getUint32(S32_FRAME_RECORD_COUNTS_OFFSET + i * 4, true));
             }
-            return { offsets, recordCounts };
+
+            return {
+                width, height, frameCount,
+                getFrame(i) {
+                    const pixels = decompressPixels(dataView, offsets[i], recordCounts[i], width, height);
+                    return { pixels, isBlank: pixels.isBlank, x: 0, y: 0, w: width, h: height };
+                },
+            };
         }
 
-        function parseS32File(buffer) {
+        // Inflates a zlib (RFC1950) byte stream using the browser's native decoder —
+        // no external library needed.
+        async function inflateZlib(bytes) {
+            const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+            const arrayBuffer = await new Response(stream).arrayBuffer();
+            return new Uint8Array(arrayBuffer);
+        }
+
+        // Reads an AGF sprite: per-frame trim boxes, then one zlib-decompresses the
+        // whole frame-data region up front so individual frames can be sliced out
+        // synchronously afterward (offsets are relative to the decompressed buffer).
+        async function readAGFSprite(dataView, buffer, width, height, frameCount) {
+            const bboxTableEnd = AGF_FRAME_BBOX_OFFSET + frameCount * 8;
+            const trailerEnd = bboxTableEnd + AGF_TRAILER_SIZE;
+            if (frameCount < 0 || buffer.byteLength < trailerEnd) {
+                throw new Error('이미지 개수 정보가 올바르지 않습니다. 올바른 AGF 파일이 아닙니다.');
+            }
+
+            const offsets = [];
+            const bboxes = [];
+            for (let i = 0; i < frameCount; i++) {
+                offsets.push(dataView.getUint32(FRAME_OFFSETS_OFFSET + i * 4, true));
+                bboxes.push({
+                    x: dataView.getUint16(AGF_FRAME_BBOX_OFFSET + i * 8, true),
+                    y: dataView.getUint16(AGF_FRAME_BBOX_OFFSET + i * 8 + 2, true),
+                    w: dataView.getUint16(AGF_FRAME_BBOX_OFFSET + i * 8 + 4, true),
+                    h: dataView.getUint16(AGF_FRAME_BBOX_OFFSET + i * 8 + 6, true),
+                });
+            }
+
+            const decompressedSize = dataView.getUint32(bboxTableEnd, true);
+            const compressedSize = dataView.getUint32(bboxTableEnd + 44, true);
+            const dataBase = trailerEnd;
+            if (buffer.byteLength < dataBase + compressedSize) {
+                throw new Error('압축된 이미지 데이터 크기가 올바르지 않습니다. 올바른 AGF 파일이 아닙니다.');
+            }
+
+            const compressedBytes = new Uint8Array(buffer, dataBase, compressedSize);
+            const decompressed = await inflateZlib(compressedBytes);
+            if (decompressed.length !== decompressedSize) {
+                throw new Error('압축 해제된 이미지 데이터 크기가 일치하지 않습니다.');
+            }
+            const decompressedView = new DataView(decompressed.buffer, decompressed.byteOffset, decompressed.byteLength);
+
+            return {
+                width, height, frameCount,
+                getFrame(i) {
+                    const { x, y, w, h } = bboxes[i];
+                    if (w === 0 || h === 0) {
+                        const empty = new Uint8ClampedArray(0);
+                        empty.isBlank = true;
+                        return { pixels: empty, isBlank: true, x, y, w: 0, h: 0 };
+                    }
+                    const start = offsets[i];
+                    const end = i < frameCount - 1 ? offsets[i + 1] : decompressedSize;
+                    const pixels = decompressPixels(decompressedView, start, (end - start) / 4, w, h);
+                    return { pixels, isBlank: pixels.isBlank, x, y, w, h };
+                },
+            };
+        }
+
+        async function parseSpriteFile(buffer) {
             imageContainer.innerHTML = '';
             exportSelectedButton.disabled = true;
             exportAllButton.disabled = true;
@@ -318,57 +413,41 @@
             clearStatus();
 
             try {
-                if (buffer.byteLength < S32_FRAME_RECORD_COUNTS_OFFSET) {
-                    throw new Error('파일이 너무 작습니다. 올바른 S32 파일이 아닙니다.');
+                if (buffer.byteLength < 16) {
+                    throw new Error('파일이 너무 작습니다. 올바른 S32/AGF 파일이 아닙니다.');
                 }
 
                 const dataView = new DataView(buffer);
                 const signature = dataView.getUint32(0, true);
-                console.log("[Log] 파일 종류:", signature);
-                console.log("[Log] 이미지 넓이:", dataView.getUint32(4, true));
-                console.log("[Log] 이미지 높이:", dataView.getUint32(8, true));
-                const imageCount = dataView.getUint32(12, true);
-                console.log("[Log] 압축된 이미지 수:", imageCount);
-
-                if (signature !== S32_SIGNATURE_ALPHA32) {
-                    throw new Error(`지원하지 않는 스프라이트 형식입니다 (signature=0x${signature.toString(16)}). 알파 채널이 있는 S32 파일(signature=0x19)만 지원합니다.`);
-                }
-
                 const width = dataView.getUint32(4, true);
                 const height = dataView.getUint32(8, true);
+                const frameCount = dataView.getUint32(12, true);
+                console.log("[Log] 파일 종류:", signature, "넓이:", width, "높이:", height, "이미지 수:", frameCount);
 
                 if (width === 0 || height === 0) {
-                    throw new Error('이미지 크기 정보가 올바르지 않습니다. 올바른 S32 파일이 아닙니다.');
+                    throw new Error('이미지 크기 정보가 올바르지 않습니다. 올바른 S32/AGF 파일이 아닙니다.');
                 }
 
-                const tableEnd = Math.max(
-                    S32_FRAME_OFFSETS_OFFSET + imageCount * 4,
-                    S32_FRAME_RECORD_COUNTS_OFFSET + imageCount * 4
-                );
-                if (imageCount < 0 || buffer.byteLength < tableEnd) {
-                    throw new Error('이미지 개수 정보가 올바르지 않습니다. 올바른 S32 파일이 아닙니다.');
+                let sprite;
+                if (signature === S32_SIGNATURE_ALPHA32) {
+                    sprite = readS32Sprite(dataView, buffer, width, height, frameCount);
+                } else if (signature === AGF_SIGNATURE) {
+                    sprite = await readAGFSprite(dataView, buffer, width, height, frameCount);
+                } else {
+                    throw new Error(`지원하지 않는 스프라이트 형식입니다 (signature=0x${signature.toString(16)}). S32(0x19) 또는 AGF(0x23) 파일만 지원합니다.`);
                 }
-
-                const { offsets: startPositions, recordCounts: compressedPixelCounts } = readFrameTable(dataView, imageCount);
 
                 let renderedCount = 0;
-                for (let i = 0; i < imageCount; i++) {
-                    const imageStart = startPositions[i];
-                    const compressedPixelCount = compressedPixelCounts[i];
-                    console.log(`[Log] ${i + 1}번째 이미지 시작 위치: ${imageStart}`);
-                    console.log(`[Log] ${i + 1}번째 이미지 압축된 픽셀 수: ${compressedPixelCount}`);
+                for (let i = 0; i < sprite.frameCount; i++) {
+                    const frame = sprite.getFrame(i);
+                    console.log(`[Log] ${i + 1}번째 이미지 추출 완료 (bbox: ${frame.x},${frame.y} ${frame.w}x${frame.h})`);
 
-                    console.log(`[Log] ${i + 1}번째 이미지 추출 시작`);
-                    const decompressedPixels = decompressPixels(dataView, imageStart, compressedPixelCount, width, height);
-                    console.log(`[Log] ${i + 1}번째 이미지 압축 해제된 픽셀 수: ${decompressedPixels.length / 4}`);
-
-                    if (skipBlankToggle.checked && decompressedPixels.isBlank) {
+                    if (skipBlankToggle.checked && frame.isBlank) {
                         console.log(`[Log] ${i + 1}번째 이미지 건너뜀 (빈 이미지)`);
                         continue;
                     }
 
-                    const imageData = createImageData(decompressedPixels, width, height);
-                    console.log(`[Log] ${i + 1}번째 이미지 추출 완료`);
+                    const imageData = createImageData(frame.pixels, frame.w, frame.h, sprite.width, sprite.height, frame.x, frame.y);
                     addImageToContainer(i + 1, imageData);
                     renderedCount++;
                 }
@@ -376,12 +455,12 @@
                 exportSelectedButton.disabled = renderedCount === 0;
                 exportAllButton.disabled = renderedCount === 0;
                 selectAllToggleButton.disabled = renderedCount === 0;
-                showInfo(renderedCount === imageCount
-                    ? `${currentFileName} - 이미지 ${imageCount}개 로드 완료`
-                    : `${currentFileName} - 이미지 ${imageCount}개 중 ${renderedCount}개 표시 (빈 이미지 ${imageCount - renderedCount}개 제외)`);
-                console.log(`[Log] S32 파일에서 이미지 추출 완료, 추출된 이미지 개수: ${imageCount}`);
+                showInfo(renderedCount === sprite.frameCount
+                    ? `${currentFileName} - 이미지 ${sprite.frameCount}개 로드 완료`
+                    : `${currentFileName} - 이미지 ${sprite.frameCount}개 중 ${renderedCount}개 표시 (빈 이미지 ${sprite.frameCount - renderedCount}개 제외)`);
+                console.log(`[Log] 파일에서 이미지 추출 완료, 추출된 이미지 개수: ${sprite.frameCount}`);
             } catch (err) {
-                console.error('[Log] S32 파일 파싱 오류:', err);
+                console.error('[Log] 파일 파싱 오류:', err);
                 imageContainer.innerHTML = '';
                 showError(`${currentFileName}: ${err.message || '파일을 읽는 중 오류가 발생했습니다.'}`);
             }
@@ -431,14 +510,20 @@
             return pixels;
         }
 
-        function createImageData(pixels, width, height) {
+        // `pixels` is a (pixelWidth x pixelHeight) RGBA buffer painted onto a
+        // (canvasWidth x canvasHeight) canvas at (offsetX, offsetY) — for S32, the
+        // pixel buffer always fills the whole canvas (offset 0,0); for AGF, frames
+        // are trimmed to a bounding box smaller than the full canvas.
+        function createImageData(pixels, pixelWidth, pixelHeight, canvasWidth, canvasHeight, offsetX, offsetY) {
             const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
             const ctx = canvas.getContext('2d');
-            const imageData = ctx.createImageData(width, height);
-            imageData.data.set(pixels);
-            ctx.putImageData(imageData, 0, 0);
+            if (pixelWidth > 0 && pixelHeight > 0) {
+                const imageData = ctx.createImageData(pixelWidth, pixelHeight);
+                imageData.data.set(pixels);
+                ctx.putImageData(imageData, offsetX, offsetY);
+            }
             return canvas.toDataURL(); // Data URL 생성
         }
 
