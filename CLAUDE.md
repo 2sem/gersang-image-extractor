@@ -47,7 +47,7 @@ An earlier "압축" (compressed) mode treated the type byte as a repeat count in
 
 Everything lives in one `<script>` block, in read order:
 
-1. `handleFileSelect` — file input → `FileReader` → `parseSpriteFile` (async).
+1. `handleFileSelect` / `selectTreeFile` — both call the shared `loadFile(file, displayLabel)`, which reads via `FileReader` → `parseSpriteFile` (async).
 2. `parseSpriteFile` — reads the shared header, reads `signature` to dispatch to `readS32Sprite` or (`await`) `readAGFSprite`, then loops `sprite.frameCount` calling `sprite.getFrame(i)` → `renderFrameCanvas` → `addImageToContainer`. Both readers return the same shape: `{width, height, frameCount, getFrame(i) => {pixels, isBlank, x, y, w, h}}`, so the render loop, skip-blank filtering, and status/button-disable logic are format-agnostic.
 3. `readS32Sprite` — reads the offset/record-count tables, `getFrame(i)` calls `decompressPixels` directly against the file's `DataView` (data is uncompressed).
 4. `readAGFSprite` (async) — reads the offset/bbox tables and trailer, `await inflateZlib(...)` once up front for the whole frame-data region, then `getFrame(i)` slices the decompressed buffer per-frame and calls `decompressPixels` against a `DataView` over that buffer.
@@ -78,3 +78,9 @@ Actual GIF encoding only happens in `exportAnimationAsGif(useSelection)`, called
 Alpha < 128 maps to the transparent palette index; there's no partial-alpha support in GIF, so translucent edge pixels get hard-thresholded. Validated by decoding exported GIFs with Pillow (correct frame count/size/loop/duration) and visually inspecting frames.
 
 Visual design: warm charcoal/amber theme (CSS variables in the `<style>` block), light/dark via `prefers-color-scheme`, card-based gallery grid, checkerboard backdrop behind the GIF preview to show transparency. Pure CSS — no DOM structure the JS depends on was changed for it.
+
+### Folder tree sidebar
+
+`#folderInput` (an `<input type="file" webkitdirectory>`) reads every file under a chosen folder recursively as a flat `FileList` with `webkitRelativePath`; `handleFolderSelect` filters to `SPRITE_FILE_EXTENSIONS` (`.agf`/`.s32`, case-insensitive), builds a nested `{ __folders, __files }` tree from each file's relative path segments, and `buildTreeNode` recursively renders it into `#fileTree` as collapsible `.tree-folder`/`.tree-file` divs (folder headers toggle their `.tree-children` sibling's `.collapsed` class). Clicking a `.tree-file` calls `selectTreeFile`, which tracks the single `.active` node and calls the same `loadFile(file, displayLabel)` helper the single-file `#fileInput` picker uses (extracted from the old `handleFileSelect` so both pickers share loading logic) — `displayLabel` is the file's relative path, so the toolbar shows e.g. `AGF/helmet01_i.AGF` instead of just the bare filename.
+
+Page layout is a flex `.app-shell`: the sidebar (`#sidebar`), a slim `#sidebarToggle` button that toggles the sidebar's `.collapsed` class (width/opacity transition to 0), and `<main class="main-content">` holding everything that used to be direct children of `<body>` (h1, toolbar, GIF preview, gallery, footer) — unchanged otherwise.

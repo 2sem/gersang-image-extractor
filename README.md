@@ -12,6 +12,7 @@ A single-page, no-build browser tool that extracts sprite frames from 거상(Ger
 
 - Loads `.S32` and `.AGF` sprite files and renders every frame as a thumbnail.
 - Auto-detects which format a file is (by its signature byte, not the extension).
+- "폴더 선택" — pick a whole folder and browse its `.agf`/`.s32` files (subfolders included) from a collapsible tree in the sidebar, instead of reopening the file picker for every file.
 - Hides fully-transparent ("blank") frames by default — many sprite files have dozens of unused frame slots — with a toggle to show them.
 - Select individual frames (click anywhere on a thumbnail, or its checkbox), shift+click to select a range, or use "전체 선택/해제" to select all.
 - Export selected frames, or all frames, as PNGs (downloads are staggered so the browser doesn't block a burst of simultaneous downloads).
