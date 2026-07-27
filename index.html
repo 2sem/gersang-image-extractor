@@ -78,23 +78,9 @@
         }
         .sidebar-header {
             flex-shrink: 0;
-            padding: 16px;
-            border-bottom: 1px solid var(--border-soft);
-        }
-        .sidebar-header .file-input-button {
-            width: 100%;
-            text-align: center;
-        }
-        #folderInput {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border: 0;
+            padding: 14px 16px 10px;
+            font-size: 12px;
+            color: var(--text-muted);
         }
         .sidebar-search {
             flex-shrink: 0;
@@ -129,51 +115,20 @@
             color: var(--text-muted);
             line-height: 1.5;
         }
-        .tree-folder, .tree-file {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 3px 6px;
-            border-radius: 3px;
-            cursor: pointer;
-            color: var(--text-muted);
-            white-space: nowrap;
-        }
-        .tree-folder:hover, .tree-file:hover {
-            background: var(--surface-hover);
-            color: var(--text);
-        }
-        .tree-file.active {
-            background: var(--accent-dim);
-            color: var(--bg);
-        }
-        .tree-toggle-icon, .tree-spacer {
-            display: inline-block;
-            width: 11px;
-            flex-shrink: 0;
-            font-size: 10px;
-            text-align: center;
-        }
-        .tree-children {
-            margin-left: 13px;
-        }
-        .tree-children.collapsed {
-            display: none;
-        }
         .tree-badge {
             font-size: 10px;
             color: var(--accent);
         }
-        .search-result-file {
+        .guide-file {
+            padding: 4px 6px 2px;
             font-weight: bold;
             color: var(--text);
+            white-space: nowrap;
         }
-        .search-result-frame {
-            margin-left: 13px;
+        .guide-frame {
+            padding: 1px 6px 1px 19px;
             color: var(--text-muted);
-        }
-        .search-result-frame:hover {
-            color: var(--accent);
+            white-space: nowrap;
         }
         .sidebar-toggle {
             flex-shrink: 0;
@@ -342,13 +297,6 @@
             border-color: var(--accent);
             box-shadow: 0 0 0 1px var(--accent), 0 4px 14px -4px var(--accent-dim);
         }
-        .image-item.search-highlight {
-            animation: search-pulse 0.5s ease-in-out 3;
-        }
-        @keyframes search-pulse {
-            0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 4px 14px -4px var(--accent-dim); }
-            50% { box-shadow: 0 0 0 3px var(--accent), 0 0 24px 4px var(--accent); }
-        }
         .image-item input[type="checkbox"] {
             position: absolute;
             top: 8px;
@@ -425,16 +373,11 @@
 <body>
     <div class="app-shell">
         <aside class="sidebar collapsed" id="sidebar">
-            <div class="sidebar-header">
-                <label class="file-input-button" for="folderInput">폴더 선택</label>
-                <input type="file" id="folderInput" webkitdirectory directory multiple>
-            </div>
+            <div class="sidebar-header">아이템 가이드 — 어떤 파일에 어떤 이미지가 있는지 찾아보세요. 클릭해서 열리지는 않으니, 파일명을 확인한 뒤 위의 "파일 선택"으로 직접 열어주세요.</div>
             <div class="sidebar-search">
                 <input type="text" id="treeSearchInput" placeholder="이름으로 검색 (예: ABC)">
             </div>
-            <div class="file-tree" id="fileTree">
-                <div class="file-tree-empty">폴더를 선택하면 폴더 안의 .agf/.s32 파일을 트리로 볼 수 있습니다. 파일이 많을 때 대화상자를 반복해서 열지 않아도 됩니다.</div>
-            </div>
+            <div class="file-tree" id="fileTree"></div>
         </aside>
         <button class="sidebar-toggle" id="sidebarToggle" title="사이드바 접기/펼치기">▸</button>
         <main class="main-content">
@@ -468,7 +411,6 @@
     <script>
         const fileInput = document.getElementById('fileInput');
         const fileNameDisplay = document.getElementById('fileNameDisplay');
-        const folderInput = document.getElementById('folderInput');
         const treeSearchInput = document.getElementById('treeSearchInput');
         const fileTree = document.getElementById('fileTree');
         const sidebar = document.getElementById('sidebar');
@@ -590,7 +532,6 @@
         }
 
         fileInput.addEventListener('change', handleFileSelect);
-        folderInput.addEventListener('change', handleFolderSelect);
         sidebarToggle.addEventListener('click', () => {
             sidebar.classList.toggle('collapsed');
             sidebarToggle.textContent = sidebar.classList.contains('collapsed') ? '▸' : '◂';
@@ -609,12 +550,8 @@
             }
         });
 
-        // Reads `file`, decodes it, and renders it — shared by the single-file picker,
-        // clicking a file in the folder tree, and clicking a search result.
-        // `displayLabel` (e.g. a relative path) overrides what's shown in the
-        // toolbar's file-name text. Returns the parseSpriteFile promise so callers
-        // (e.g. search result clicks) can await full rendering before acting further
-        // — e.g. jumping to a specific frame.
+        // Reads `file`, decodes it, and renders it. `displayLabel` overrides what's
+        // shown in the toolbar's file-name text; returns the parseSpriteFile promise.
         async function loadFile(file, displayLabel) {
             currentFileName = file.name;
             fileNameDisplay.textContent = displayLabel || file.name;
@@ -630,24 +567,6 @@
             loadFile(file);
         }
 
-        // Folder picker (webkitdirectory): reads every file under the chosen folder
-        // (recursively) as a flat FileList with `webkitRelativePath`, filters to
-        // .agf/.s32, and renders a collapsible tree in the sidebar so the user can
-        // click through many files without reopening the file-picker dialog each time.
-        const SPRITE_FILE_EXTENSIONS = /\.(agf|s32)$/i;
-        let activeTreeFileEl = null;
-        let allTreeFiles = []; // flat [{ name, file, relativePath }] for the current folder — used by search
-        let cachedTreeRootEl = null; // the built tree, so clearing the search box can restore it without rebuilding
-
-        // GERSANG_LABELS comes from labels.js plus indexes/*.js (loaded via plain
-        // script tags, not fetch — see labels.js for why). Build a lowercase-keyed
-        // lookup once so filename matching is case-insensitive regardless of how a
-        // real folder happens to be cased.
-        const LABELS_LOOKUP = {};
-        for (const key in (typeof GERSANG_LABELS !== 'undefined' ? GERSANG_LABELS : {})) {
-            LABELS_LOOKUP[key.toLowerCase()] = GERSANG_LABELS[key];
-        }
-
         // 거상 asset naming convention: "<item>_I.<ext>" is the inventory icon,
         // "<item>_F.<ext>" is the on-ground/field sprite. Purely a filename
         // convention — not something the file format itself encodes.
@@ -657,154 +576,53 @@
             return null;
         }
 
-        function handleFolderSelect(event) {
-            const files = Array.from(event.target.files).filter(f => SPRITE_FILE_EXTENSIONS.test(f.name));
-            fileTree.innerHTML = '';
-            activeTreeFileEl = null;
-            cachedTreeRootEl = null;
-            allTreeFiles = [];
-            treeSearchInput.value = '';
+        // The sidebar is a static reference guide built directly from GERSANG_LABELS
+        // (labels.js plus indexes/*.js, script-tag loaded — see labels.js for why not
+        // fetch()) — it is not tied to any locally picked file/folder, and entries
+        // are not clickable. It just tells the user which file (and frame) to
+        // go open via the "파일 선택" picker above; there is no "load on click" here.
+        function renderLabelGuide(query) {
+            const catalog = typeof GERSANG_LABELS !== 'undefined' ? GERSANG_LABELS : {};
+            const q = query.trim().toLowerCase();
+            const filenames = Object.keys(catalog).sort();
 
-            if (files.length === 0) {
-                fileTree.innerHTML = '<div class="file-tree-empty">선택한 폴더(하위 폴더 포함)에 .agf/.s32 파일이 없습니다.</div>';
-                return;
-            }
-
-            allTreeFiles = files.map(file => ({ name: file.name, file, relativePath: file.webkitRelativePath }));
-
-            // Build a nested tree from each file's relative path, e.g.
-            // "MyFolder/AGF/ring01_i.AGF" -> { __folders: { AGF: { __files: [...] } } }
-            const root = { __folders: {}, __files: [] };
-            for (const file of files) {
-                const parts = file.webkitRelativePath.split('/');
-                let node = root;
-                for (let i = 1; i < parts.length - 1; i++) {
-                    node.__folders[parts[i]] = node.__folders[parts[i]] || { __folders: {}, __files: [] };
-                    node = node.__folders[parts[i]];
-                }
-                node.__files.push({ name: parts[parts.length - 1], file });
-            }
-
-            const rootLabel = files[0].webkitRelativePath.split('/')[0];
-            cachedTreeRootEl = buildTreeNode(rootLabel, root);
-            fileTree.appendChild(cachedTreeRootEl);
-            showInfo(`${rootLabel} - .agf/.s32 파일 ${files.length}개 발견`);
-        }
-
-        // Filters the sidebar between the normal folder tree and a flat search-result
-        // list, matching against both saved labels (labels.js) and raw filenames —
-        // typing "ABC" finds a file via its labeled frame even though "ABC" never
-        // appears in the filename itself, and still finds files by plain filename
-        // substring for anything not yet labeled.
-        treeSearchInput.addEventListener('input', () => {
-            const query = treeSearchInput.value.trim().toLowerCase();
-            if (!query) {
-                fileTree.innerHTML = '';
-                if (cachedTreeRootEl) fileTree.appendChild(cachedTreeRootEl);
-                return;
-            }
-            renderSearchResults(query);
-        });
-
-        function renderSearchResults(query) {
-            const results = [];
-            for (const entry of allTreeFiles) {
-                const labelsForFile = LABELS_LOOKUP[entry.name.toLowerCase()] || {};
-                const matchedFrames = Object.entries(labelsForFile)
-                    .filter(([, label]) => label.toLowerCase().includes(query))
-                    .map(([frameIndex, label]) => ({ frameIndex, label }));
-                const filenameMatches = entry.name.toLowerCase().includes(query);
-                if (matchedFrames.length > 0 || filenameMatches) {
-                    results.push({ ...entry, matchedFrames, badge: getFileTypeBadge(entry.name) });
-                }
+            const rows = [];
+            for (const filename of filenames) {
+                const frameEntries = Object.entries(catalog[filename]);
+                const matchedFrames = q
+                    ? frameEntries.filter(([, label]) => label.toLowerCase().includes(q))
+                    : frameEntries;
+                const filenameMatches = !q || filename.toLowerCase().includes(q);
+                if (q && matchedFrames.length === 0 && !filenameMatches) continue;
+                rows.push({ filename, badge: getFileTypeBadge(filename), frames: q ? matchedFrames : frameEntries });
             }
 
             fileTree.innerHTML = '';
-            if (results.length === 0) {
+            if (rows.length === 0) {
                 const empty = document.createElement('div');
                 empty.className = 'file-tree-empty';
-                empty.textContent = `"${query}"에 대한 검색 결과가 없습니다.`;
+                empty.textContent = q ? `"${query}"에 대한 결과가 없습니다.` : '아직 등록된 항목이 없습니다.';
                 fileTree.appendChild(empty);
                 return;
             }
 
-            for (const result of results) {
+            for (const row of rows) {
                 const fileRow = document.createElement('div');
-                fileRow.className = 'tree-file search-result-file';
-                fileRow.innerHTML = `<span>${result.name}</span>` + (result.badge ? ` <span class="tree-badge">[${result.badge}]</span>` : '');
-                fileRow.addEventListener('click', () => loadFile(result.file, result.relativePath || result.name));
+                fileRow.className = 'guide-file';
+                fileRow.innerHTML = `<span>${row.filename}</span>` + (row.badge ? ` <span class="tree-badge">[${row.badge}]</span>` : '');
                 fileTree.appendChild(fileRow);
 
-                for (const { frameIndex, label } of result.matchedFrames) {
+                for (const [frameIndex, label] of row.frames) {
                     const frameRow = document.createElement('div');
-                    frameRow.className = 'tree-file search-result-frame';
+                    frameRow.className = 'guide-frame';
                     frameRow.textContent = `- ${frameIndex}: ${label}`;
-                    frameRow.addEventListener('click', async () => {
-                        await loadFile(result.file, result.relativePath || result.name);
-                        highlightFrame(frameIndex);
-                    });
                     fileTree.appendChild(frameRow);
                 }
             }
         }
 
-        // Scrolls to and briefly pulses the thumbnail for `frameIndex` (the same
-        // 1-based number shown under each thumbnail) after a search-result click
-        // loads its file. If the frame was filtered out by skipBlankToggle, there's
-        // nothing to jump to — search results all come from labeled frames, and a
-        // labeled frame is never blank in practice, so this is an acceptable gap.
-        function highlightFrame(frameIndex) {
-            const label = Array.from(imageContainer.querySelectorAll('.image-item label'))
-                .find(l => l.textContent === String(frameIndex));
-            const item = label ? label.closest('.image-item') : null;
-            if (!item) return;
-            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            item.classList.add('search-highlight');
-            setTimeout(() => item.classList.remove('search-highlight'), 1600);
-        }
-
-        function buildTreeNode(label, node) {
-            const wrapper = document.createElement('div');
-
-            const header = document.createElement('div');
-            header.className = 'tree-folder';
-            header.innerHTML = `<span class="tree-toggle-icon">▾</span><span>${label}</span>`;
-
-            const childrenEl = document.createElement('div');
-            childrenEl.className = 'tree-children';
-
-            const folderNames = Object.keys(node.__folders).sort();
-            for (const name of folderNames) {
-                childrenEl.appendChild(buildTreeNode(name, node.__folders[name]));
-            }
-
-            const fileEntries = node.__files.slice().sort((a, b) => a.name.localeCompare(b.name));
-            for (const { name, file } of fileEntries) {
-                const fileEl = document.createElement('div');
-                fileEl.className = 'tree-file';
-                fileEl.innerHTML = `<span class="tree-spacer"></span><span>${name}</span>`;
-                fileEl.addEventListener('click', () => selectTreeFile(fileEl, file));
-                childrenEl.appendChild(fileEl);
-            }
-
-            header.addEventListener('click', () => {
-                childrenEl.classList.toggle('collapsed');
-                header.querySelector('.tree-toggle-icon').textContent = childrenEl.classList.contains('collapsed') ? '▸' : '▾';
-            });
-
-            wrapper.appendChild(header);
-            wrapper.appendChild(childrenEl);
-            return wrapper;
-        }
-
-        function selectTreeFile(fileEl, file) {
-            if (activeTreeFileEl) {
-                activeTreeFileEl.classList.remove('active');
-            }
-            fileEl.classList.add('active');
-            activeTreeFileEl = fileEl;
-            loadFile(file, file.webkitRelativePath || file.name);
-        }
+        treeSearchInput.addEventListener('input', () => renderLabelGuide(treeSearchInput.value));
+        renderLabelGuide(''); // populate the guide with the full catalog on load
 
         // 거상(Gersang) sprite container family. Both formats share a 16-byte header
         // (u32 signature, u32 width, u32 height, u32 frameCount) and a frame-offset
