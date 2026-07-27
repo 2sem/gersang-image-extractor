@@ -35,6 +35,7 @@
     <h1>거상 이미지 Viewer</h1>
     <div id="statusMessage"></div>
     <input type="file" id="fileInput" accept=".s32">
+    <label><input type="checkbox" id="skipBlankToggle" checked> 빈 이미지 건너뛰기</label>
     <button id="selectAllToggle" disabled>전체 선택/해제</button>
     <button id="exportSelected" disabled>선택한 이미지 내보내기</button>
     <button id="exportAll" disabled>전체 내보내기</button>
@@ -45,7 +46,10 @@
         const exportSelectedButton = document.getElementById('exportSelected');
         const exportAllButton = document.getElementById('exportAll');
         const selectAllToggleButton = document.getElementById('selectAllToggle');
+        const skipBlankToggle = document.getElementById('skipBlankToggle');
         const statusMessage = document.getElementById('statusMessage');
+
+        let currentBuffer = null;
 
         function toggleSelectAll() {
             const checkboxes = document.querySelectorAll('.image-item input[type="checkbox"]');
@@ -74,6 +78,11 @@
         exportSelectedButton.addEventListener('click', exportSelectedImages);
         exportAllButton.addEventListener('click', exportAllImages);
         selectAllToggleButton.addEventListener('click', toggleSelectAll);
+        skipBlankToggle.addEventListener('change', () => {
+            if (currentBuffer) {
+                parseS32File(currentBuffer);
+            }
+        });
 
         function handleFileSelect(event) {
             const file = event.target.files[0];
@@ -84,8 +93,8 @@
 
             const reader = new FileReader();
             reader.onload = function(e) {
-                const arrayBuffer = e.target.result;
-                parseS32File(arrayBuffer);
+                currentBuffer = e.target.result;
+                parseS32File(currentBuffer);
             };
             reader.readAsArrayBuffer(file);
         }
@@ -128,6 +137,7 @@
                     compressedPixelCounts.push(dataView.getUint32(2416 + i * 4, true));
                 }
 
+                let renderedCount = 0;
                 for (let i = 0; i < imageCount; i++) {
                     const imageStart = startPositions[i];
                     const compressedPixelCount = compressedPixelCounts[i];
@@ -137,15 +147,24 @@
                     console.log(`[Log] ${i + 1}번째 이미지 추출 시작`);
                     const decompressedPixels = decompressPixels(dataView, imageStart, compressedPixelCount, width, height);
                     console.log(`[Log] ${i + 1}번째 이미지 압축 해제된 픽셀 수: ${decompressedPixels.length / 4}`);
+
+                    if (skipBlankToggle.checked && decompressedPixels.isBlank) {
+                        console.log(`[Log] ${i + 1}번째 이미지 건너뜀 (빈 이미지)`);
+                        continue;
+                    }
+
                     const imageData = createImageData(decompressedPixels, width, height);
                     console.log(`[Log] ${i + 1}번째 이미지 추출 완료`);
                     addImageToContainer(i + 1, imageData);
+                    renderedCount++;
                 }
 
-                exportSelectedButton.disabled = imageCount === 0;
-                exportAllButton.disabled = imageCount === 0;
-                selectAllToggleButton.disabled = imageCount === 0;
-                showInfo(`${currentFileName} - 이미지 ${imageCount}개 로드 완료`);
+                exportSelectedButton.disabled = renderedCount === 0;
+                exportAllButton.disabled = renderedCount === 0;
+                selectAllToggleButton.disabled = renderedCount === 0;
+                showInfo(renderedCount === imageCount
+                    ? `${currentFileName} - 이미지 ${imageCount}개 로드 완료`
+                    : `${currentFileName} - 이미지 ${imageCount}개 중 ${renderedCount}개 표시 (빈 이미지 ${imageCount - renderedCount}개 제외)`);
                 console.log(`[Log] S32 파일에서 이미지 추출 완료, 추출된 이미지 개수: ${imageCount}`);
             } catch (err) {
                 console.error('[Log] S32 파일 파싱 오류:', err);
@@ -189,6 +208,7 @@
             }
 
             console.log(`[Log] 이미지 압축 해제 완료. 칠하는 명령 수: ${paintedPixelCommands}, 건너뛰는 명령 수: ${skippedPixelCommands}, 건너뛴 픽셀 총 횟수: ${totalSkippedPixels}`);
+            pixels.isBlank = paintedPixelCommands === 0;
             return pixels;
         }
 
