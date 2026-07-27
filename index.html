@@ -205,6 +205,7 @@
             display: block;
             margin: 18px auto 0;
             max-width: 100%;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -412,6 +413,13 @@
                 <label for="imageCheckbox${index}">${index}</label>
                 <img src="${imageData}" alt="Image ${index}">
             `;
+            const checkbox = div.querySelector('input[type="checkbox"]');
+            div.addEventListener('click', (event) => {
+                if (event.target === checkbox || event.target.tagName === 'LABEL') {
+                    return;
+                }
+                checkbox.checked = !checkbox.checked;
+            });
             imageContainer.appendChild(div);
         }
 
