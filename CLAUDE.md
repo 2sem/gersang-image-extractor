@@ -54,12 +54,14 @@ Everything lives in one `<script>` block, in read order:
 5. `inflateZlib` — wraps the browser-native `DecompressionStream('deflate')` in a `Blob`/`Response` round-trip to inflate a zlib byte stream; no external library.
 6. `decompressPixels` — the core RLE decoder per the format spec above; shared by both readers.
 7. `renderFrameCanvas` — writes decoded RGBA pixels into an offscreen `<canvas>`, composited at `(offsetX, offsetY)` so AGF's trimmed per-frame bounding box lands in the right place on the full canvas (S32 frames always pass `offsetX=offsetY=0` and fill the whole canvas). Returns the canvas itself (not a data URL) so callers can also read back raw RGBA via `getImageData` — used for GIF frame capture.
-8. `addImageToContainer` — renders one numbered, checkbox-selectable thumbnail into `#imageContainer`; also wires a click handler so tapping anywhere on the card (image or padding) toggles its checkbox without double-firing when the checkbox/label itself is clicked.
+8. `addImageToContainer` — renders one numbered, checkbox-selectable thumbnail into `#imageContainer`; also wires a click handler so tapping anywhere on the card (image or padding) toggles its checkbox without double-firing when the checkbox/label itself is clicked, plus shift+click range selection (see below).
 9. `exportSelectedImages` / `exportAllImages` / `downloadImage` — trigger PNG downloads via synthetic `<a download>` clicks, staggered `DOWNLOAD_INTERVAL_MS` apart to avoid the browser blocking a burst of same-tick downloads — unless `#animationModeToggle` is checked, in which case both export buttons call `exportAnimationAsGif` instead (see below).
 
 `parseSpriteFile` validates buffer size and header sanity (throws/shows a user-facing error via `showError` on garbage input) and reports load status (`showInfo`) — see `statusMessage` element.
 
 Many sprite files have mostly-empty frame slots (e.g. `sample/S32/Helmet01_I.S32` has 99 fully-transparent frames out of 100). `#skipBlankToggle` (checked by default) hides frames where a reader's `getFrame` set `isBlank` (no painted pixel-ops); `currentBuffer` caches the last-loaded `ArrayBuffer` so toggling it re-runs `parseSpriteFile` without re-picking the file.
+
+Shift+click range selection: `itemCheckboxes[i]` holds the i-th rendered thumbnail's checkbox in display order (`addImageToContainer`'s `itemIndex` param, passed as `renderedCount` at render time — both reset at the top of `parseSpriteFile`), and `lastClickedItemIndex` is the anchor. Clicking any item updates the anchor; shift+clicking another calls `fillRange` to force-check everything between the two (inclusive), via the checkbox, label, or card/image click. Important gotcha: this does **not** call `preventDefault()` on the click — doing so on a checkbox makes the browser revert `.checked` to its pre-click value after all listeners finish, silently undoing any programmatic assignment made during the same handler. Instead, the native/manual toggle for the just-clicked item is left to happen normally, and the range-fill runs as a separate step afterward.
 
 ### Animation (GIF) mode
 
