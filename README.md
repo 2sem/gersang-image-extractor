@@ -4,7 +4,9 @@ A single-page, no-build browser tool that extracts sprite frames from 거상(Ger
 
 **Live:** https://2sem.github.io/gersang-image-extractor/ (GitHub Pages, `index.html` is the entry point).
 
-![거상 이미지 Viewer showing ring01_i.AGF loaded, 17 non-blank frames out of 100 displayed](docs/screenshot.png)
+<video src="docs/demo.mp4" controls poster="docs/screenshot.png" width="900">
+  Your browser doesn't support inline video — <a href="docs/demo.mp4">download the demo</a> instead.
+</video>
 
 ## Features
 
