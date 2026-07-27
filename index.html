@@ -75,14 +75,6 @@
         exportAllButton.addEventListener('click', exportAllImages);
         selectAllToggleButton.addEventListener('click', toggleSelectAll);
 
-        const compressionTypeSelect = document.createElement('select');
-        compressionTypeSelect.id = 'compressionTypeSelect';
-        compressionTypeSelect.innerHTML = `
-            <option value="compressed">압축</option>
-            <option value="skipOnly">건너띄기만 압축</option>
-        `;
-        document.body.insertBefore(compressionTypeSelect, document.getElementById('fileInput'));
-
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -163,12 +155,10 @@
         }
 
         function decompressPixels(dataView, start, count, width, height) {
-            const compressionType = document.getElementById('compressionTypeSelect').value;
             const pixels = new Uint8ClampedArray(width * height * 4);
             let pixelIndex = 0;
             let paintedPixelCommands = 0; // 압축된 칠하는 명령 수
             let skippedPixelCommands = 0; // 압축된 건너뛰는 명령 수
-            let totalPaintedPixels = 0; // 칠한 픽셀의 총 횟수
             let totalSkippedPixels = 0; // 건너뛴 픽셀의 총 횟수
 
             for (let i = 0; i < count; i++) {
@@ -179,33 +169,16 @@
                 console.log(`[Log] ${i + 1}번째 픽셀 Hex: ${hexValue}`);
 
                 if (type > 0) {
-                    if (compressionType === 'compressed') {
-                        const repeat = type === 0xFF ? 1 : type;
-                        const red = dataView.getUint8(start + i * 4 + 1);
-                        const green = dataView.getUint8(start + i * 4 + 2);
-                        const blue = dataView.getUint8(start + i * 4 + 3);
-                        paintedPixelCommands++;
-                        totalPaintedPixels += repeat;
-                        console.log(`[Log] ${i + 1}번째 픽셀. 반복: ${repeat}, Red: ${red}, Green: ${green}, Blue: ${blue}`);
-                        for (let j = 0; j < repeat; j++) {
-                            pixels[pixelIndex++] = red;
-                            pixels[pixelIndex++] = green;
-                            pixels[pixelIndex++] = blue;
-                            pixels[pixelIndex++] = 255;
-                        }
-                    } else if (compressionType === 'skipOnly') {
-                        const alpha = type;
-                        const red = dataView.getUint8(start + i * 4 + 1);
-                        const green = dataView.getUint8(start + i * 4 + 2);
-                        const blue = dataView.getUint8(start + i * 4 + 3);
-                        paintedPixelCommands++;
-                        totalPaintedPixels++;
-                        console.log(`[Log] ${i + 1}번째 픽셀. Alpha: ${alpha}, Red: ${red}, Green: ${green}, Blue: ${blue}`);
-                        pixels[pixelIndex++] = red;
-                        pixels[pixelIndex++] = green;
-                        pixels[pixelIndex++] = blue;
-                        pixels[pixelIndex++] = alpha;
-                    }
+                    const alpha = type;
+                    const red = dataView.getUint8(start + i * 4 + 1);
+                    const green = dataView.getUint8(start + i * 4 + 2);
+                    const blue = dataView.getUint8(start + i * 4 + 3);
+                    paintedPixelCommands++;
+                    console.log(`[Log] ${i + 1}번째 픽셀. Alpha: ${alpha}, Red: ${red}, Green: ${green}, Blue: ${blue}`);
+                    pixels[pixelIndex++] = red;
+                    pixels[pixelIndex++] = green;
+                    pixels[pixelIndex++] = blue;
+                    pixels[pixelIndex++] = alpha;
                 } else {
                     const skipCount = dataView.getUint8(start + i * 4 + 1);
                     skippedPixelCommands++;
@@ -215,7 +188,7 @@
                 }
             }
 
-            console.log(`[Log] 이미지 압축 해제 완료. 칠하는 명령 수: ${paintedPixelCommands}, 칠한 픽셀 총 횟수: ${totalPaintedPixels}, 건너뛰는 명령 수: ${skippedPixelCommands}, 건너뛴 픽셀 총 횟수: ${totalSkippedPixels}`);
+            console.log(`[Log] 이미지 압축 해제 완료. 칠하는 명령 수: ${paintedPixelCommands}, 건너뛰는 명령 수: ${skippedPixelCommands}, 건너뛴 픽셀 총 횟수: ${totalSkippedPixels}`);
             return pixels;
         }
 

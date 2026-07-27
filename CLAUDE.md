@@ -23,10 +23,11 @@ All integers little-endian.
 - At offset `2416`: one `u32` per image = compressed pixel count for that image.
 - Each compressed pixel record is 4 bytes: `[type, byte1, byte2, byte3]`.
   - `type == 0`: skip command — `byte1` = number of pixels to skip (painted fully transparent `0,0,0,0`); `byte2`/`byte3` unused.
-  - `type > 0`, mode "압축" (compressed): `type` = repeat count (`0x01`-`0xFE` literal, `0xFF` means repeat 1), followed by R, G, B (fully opaque, alpha=255).
-  - `type > 0`, mode "건너띄기만압축" (skip-only compression): `type` = alpha value directly, followed by R, G, B (single pixel, no repeat).
+  - `type > 0`: `type` = alpha value directly, followed by R, G, B — one record decodes exactly one pixel (no repeat/run-length semantics for opaque pixels; only skip-runs are RLE'd).
 
-`sample/` contains real `.S32` fixtures (`armor02_I.S32`, `CoinIcon.S32`, `creature_i.S32`, `Element01_I.S32`, `Helmet01_I.S32`, `Ring01_I.S32`, `Weapon02_F.S32`) for manual testing against both decompression modes.
+An earlier "압축" (compressed) mode treated `type` as a repeat count instead of an alpha value. It was removed — real S32 data has non-`0x00`/`0xFF` type bytes (variable alpha), so that interpretation desyncs `pixelIndex` and corrupts the image (confirmed against `sample/Helmet01_I.S32`). The alpha-value interpretation above is the correct/only format.
+
+`sample/` contains real `.S32` fixtures (`armor02_I.S32`, `CoinIcon.S32`, `creature_i.S32`, `Element01_I.S32`, `Helmet01_I.S32`, `Ring01_I.S32`, `Weapon02_F.S32`) for manual testing.
 
 `s32-hex` is a raw hex dump excerpt of an `.S32` file's compressed-pixel region (offset `0x4C0`-`0x64F`), useful as a reference for manually verifying decoder output byte-by-byte.
 
@@ -36,9 +37,9 @@ Everything lives in one `<script>` block, in read order:
 
 1. `handleFileSelect` — file input → `FileReader` → `parseS32File`.
 2. `parseS32File` — reads header, builds `startPositions` (with the `+3660` offset baked in) and `compressedPixelCounts` arrays, then loops images calling `decompressPixels` → `createImageData` → `addImageToContainer`.
-3. `decompressPixels` — the core RLE decoder; branches on the `#compressionTypeSelect` dropdown value (`compressed` vs `skipOnly`) per the format spec above.
+3. `decompressPixels` — the core RLE decoder per the format spec above.
 4. `createImageData` — writes decoded RGBA pixels into an offscreen `<canvas>`, returns a data URL.
 5. `addImageToContainer` — renders one numbered, checkbox-selectable thumbnail into `#imageContainer`.
-6. `exportSelectedImages` / `exportAllImages` / `downloadImage` — trigger PNG downloads via synthetic `<a download>` clicks.
+6. `exportSelectedImages` / `exportAllImages` / `downloadImage` — trigger PNG downloads via synthetic `<a download>` clicks, staggered `DOWNLOAD_INTERVAL_MS` apart to avoid the browser blocking a burst of same-tick downloads.
 
-The compression-type `<select>` (`압축` / `건너띄기만 압축`) is created dynamically in JS and inserted before `#fileInput`, not present in the static markup.
+`parseS32File` validates buffer size and header sanity (throws/shows a user-facing error via `showError` on garbage input) and reports load status (`showInfo`) — see `statusMessage` element.
