@@ -26,8 +26,8 @@
 <body>
     <h1>거상 이미지 Viewer</h1>
     <input type="file" id="fileInput" accept=".s32">
-    <button id="exportSelected">선택한 이미지 내보내기</button>
-    <button id="exportAll">전체 내보내기</button>
+    <button id="exportSelected" disabled>선택한 이미지 내보내기</button>
+    <button id="exportAll" disabled>전체 내보내기</button>
     <div class="image-container" id="imageContainer"></div>
     <script>
         const fileInput = document.getElementById('fileInput');
@@ -61,6 +61,8 @@
 
         function parseS32File(buffer) {
             imageContainer.innerHTML = '';
+            exportSelectedButton.disabled = true;
+            exportAllButton.disabled = true;
             const dataView = new DataView(buffer);
             console.log("[Log] 파일 종류:", dataView.getUint32(0, true));
             console.log("[Log] 이미지 넓이:", dataView.getUint32(4, true));
@@ -92,6 +94,8 @@
                 addImageToContainer(i + 1, imageData);
             }
 
+            exportSelectedButton.disabled = imageCount === 0;
+            exportAllButton.disabled = imageCount === 0;
             console.log(`[Log] S32 파일에서 이미지 추출 완료, 추출된 이미지 개수: ${imageCount}`);
         }
 
