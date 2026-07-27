@@ -30,6 +30,7 @@
     <h1>거상 이미지 Viewer</h1>
     <div id="statusMessage"></div>
     <input type="file" id="fileInput" accept=".s32">
+    <button id="selectAllToggle" disabled>전체 선택/해제</button>
     <button id="exportSelected" disabled>선택한 이미지 내보내기</button>
     <button id="exportAll" disabled>전체 내보내기</button>
     <div class="image-container" id="imageContainer"></div>
@@ -38,7 +39,14 @@
         const imageContainer = document.getElementById('imageContainer');
         const exportSelectedButton = document.getElementById('exportSelected');
         const exportAllButton = document.getElementById('exportAll');
+        const selectAllToggleButton = document.getElementById('selectAllToggle');
         const statusMessage = document.getElementById('statusMessage');
+
+        function toggleSelectAll() {
+            const checkboxes = document.querySelectorAll('.image-item input[type="checkbox"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => { cb.checked = !allChecked; });
+        }
 
         let currentFileName = '';
 
@@ -60,6 +68,7 @@
         fileInput.addEventListener('change', handleFileSelect);
         exportSelectedButton.addEventListener('click', exportSelectedImages);
         exportAllButton.addEventListener('click', exportAllImages);
+        selectAllToggleButton.addEventListener('click', toggleSelectAll);
 
         const compressionTypeSelect = document.createElement('select');
         compressionTypeSelect.id = 'compressionTypeSelect';
@@ -88,6 +97,7 @@
             imageContainer.innerHTML = '';
             exportSelectedButton.disabled = true;
             exportAllButton.disabled = true;
+            selectAllToggleButton.disabled = true;
             clearStatus();
 
             try {
@@ -137,6 +147,7 @@
 
                 exportSelectedButton.disabled = imageCount === 0;
                 exportAllButton.disabled = imageCount === 0;
+                selectAllToggleButton.disabled = imageCount === 0;
                 showInfo(`${currentFileName} - 이미지 ${imageCount}개 로드 완료`);
                 console.log(`[Log] S32 파일에서 이미지 추출 완료, 추출된 이미지 개수: ${imageCount}`);
             } catch (err) {
