@@ -92,16 +92,22 @@
             border-bottom: 1px solid var(--border-soft);
             margin-bottom: 24px;
         }
-        input[type="file"] {
-            font-family: var(--font-mono);
-            font-size: 13px;
-            color: var(--text-muted);
+        #fileInput {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
         }
-        input[type="file"]::file-selector-button {
+        .file-input-button {
+            display: inline-block;
             font-family: var(--font-mono);
             font-size: 13px;
             padding: 7px 14px;
-            margin-right: 10px;
             border: 1px solid var(--border);
             border-radius: 3px;
             background: var(--surface);
@@ -109,9 +115,14 @@
             cursor: pointer;
             transition: border-color 0.15s ease, background 0.15s ease;
         }
-        input[type="file"]::file-selector-button:hover {
+        .file-input-button:hover {
             border-color: var(--accent);
             background: var(--surface-hover);
+        }
+        #fileNameDisplay {
+            margin-left: 10px;
+            font-size: 13px;
+            color: var(--text-muted);
         }
         .toolbar-divider {
             width: 1px;
@@ -257,7 +268,9 @@
     <h1>거상 이미지 Viewer</h1>
     <div id="statusMessage"></div>
     <div class="toolbar">
+        <label class="file-input-button" for="fileInput">파일 선택</label>
         <input type="file" id="fileInput" accept=".s32,.agf">
+        <span id="fileNameDisplay">.agf 파일을 선택하세요 (구버전 .S32도 지원)</span>
         <div class="toolbar-divider"></div>
         <label class="skip-blank-label"><input type="checkbox" id="skipBlankToggle" checked> 빈 이미지 건너뛰기</label>
         <div class="toolbar-divider"></div>
@@ -278,6 +291,7 @@
     </footer>
     <script>
         const fileInput = document.getElementById('fileInput');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
         const imageContainer = document.getElementById('imageContainer');
         const exportSelectedButton = document.getElementById('exportSelected');
         const exportAllButton = document.getElementById('exportAll');
@@ -400,6 +414,7 @@
             if (!file) return;
 
             currentFileName = file.name;
+            fileNameDisplay.textContent = file.name;
             showInfo(`${file.name} 불러오는 중...`);
 
             const reader = new FileReader();
