@@ -316,6 +316,20 @@
 
         let currentBuffer = null;
 
+        // Shift+click range selection: itemCheckboxes[i] is the i-th rendered
+        // thumbnail's checkbox, in display order; lastClickedItemIndex is the anchor
+        // for the range. Both reset on every new parse.
+        let itemCheckboxes = [];
+        let lastClickedItemIndex = null;
+
+        function fillRange(fromIndex, toIndex) {
+            const start = Math.min(fromIndex, toIndex);
+            const end = Math.max(fromIndex, toIndex);
+            for (let i = start; i <= end; i++) {
+                itemCheckboxes[i].checked = true;
+            }
+        }
+
         // Populated when animationModeToggle is checked and a file is loaded: the
         // shown frames' full-canvas RGBA buffers (for on-demand GIF export) and their
         // already-rendered data URLs (for the live preview, which just cycles through
@@ -568,6 +582,8 @@
             stopGifPreview();
             currentAnimationFrames = null;
             currentAnimationFrameDataUrls = null;
+            itemCheckboxes = [];
+            lastClickedItemIndex = null;
             clearStatus();
 
             try {
@@ -611,7 +627,7 @@
 
                     const canvas = renderFrameCanvas(frame.pixels, frame.w, frame.h, sprite.width, sprite.height, frame.x, frame.y);
                     const dataUrl = canvas.toDataURL();
-                    addImageToContainer(i + 1, dataUrl);
+                    addImageToContainer(i + 1, dataUrl, renderedCount);
                     renderedCount++;
 
                     if (wantAnimationFrames) {
@@ -709,7 +725,7 @@
             return canvas;
         }
 
-        function addImageToContainer(index, imageData) {
+        function addImageToContainer(index, imageData, itemIndex) {
             const div = document.createElement('div');
             div.className = 'image-item';
             div.innerHTML = `
@@ -718,16 +734,22 @@
                 <img src="${imageData}" alt="Image ${index}">
             `;
             const checkbox = div.querySelector('input[type="checkbox"]');
+            itemCheckboxes[itemIndex] = checkbox;
+
             div.addEventListener('click', (event) => {
-                if (event.target === checkbox || event.target.tagName === 'LABEL') {
-                    return; // native checkbox/label click already toggles + fires 'change'
+                // For checkbox/label targets, the native click has already toggled
+                // `checkbox.checked` by the time this bubbles up here — don't touch
+                // it (calling preventDefault to override it would make the browser
+                // revert the checkbox to its pre-click value afterward, undoing
+                // anything we set). Only card/image/padding clicks need a manual
+                // toggle, since there's no native behavior for those.
+                if (event.target !== checkbox && event.target.tagName !== 'LABEL') {
+                    checkbox.checked = !checkbox.checked;
                 }
-                checkbox.checked = !checkbox.checked;
-                if (animationModeToggle.checked) {
-                    updateGifPreviewForSelection();
+                if (event.shiftKey && lastClickedItemIndex !== null) {
+                    fillRange(lastClickedItemIndex, itemIndex);
                 }
-            });
-            checkbox.addEventListener('change', () => {
+                lastClickedItemIndex = itemIndex;
                 if (animationModeToggle.checked) {
                     updateGifPreviewForSelection();
                 }
