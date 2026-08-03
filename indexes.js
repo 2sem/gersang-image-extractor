@@ -41,7 +41,11 @@ GERSANG_LABELS["armor03_i.AGF"].folder = "Textures/Items";
 GERSANG_LABELS["armor04_i.AGF"] = {
     name: "방어구 및 반지",
     items: {
-        
+        "72": "천라복장",
+        "73": "천라모자",
+        "74": "천라장갑",
+        "75": "천라요대",
+        "76": "천라신발"
     }
 };
 GERSANG_LABELS["armor04_i.AGF"].folder = "Textures/Items";
@@ -537,7 +541,7 @@ GERSANG_LABELS["ring02_i.AGF"].folder = "Textures/Items";
 GERSANG_LABELS["ring03_i.AGF"] = {
     name: "반지/목걸이/각반",
     items: {
-        
+        "43": "천라반지"
     }
 };
 GERSANG_LABELS["ring03_i.AGF"].folder = "Textures/Items";
