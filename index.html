@@ -129,6 +129,12 @@
             padding: 1px 6px 1px 19px;
             color: var(--text-muted);
             white-space: nowrap;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .guide-frame:hover {
+            color: var(--accent);
+            background: var(--surface-hover);
         }
         .guide-folder {
             display: flex;
@@ -337,6 +343,13 @@
         .image-item.search-match {
             outline: 3px solid var(--accent);
             outline-offset: 2px;
+        }
+        @keyframes jump-flash {
+            0%, 100% { box-shadow: 0 0 0 0 transparent; }
+            25% { box-shadow: 0 0 0 5px var(--accent); }
+        }
+        .image-item.jump-flash {
+            animation: jump-flash 1.2s ease-out;
         }
         .image-item input[type="checkbox"] {
             position: absolute;
@@ -634,8 +647,11 @@
         // The sidebar is a static reference guide built directly from GERSANG_LABELS
         // (labels.js plus the generated indexes.js, script-tag loaded — see labels.js
         // for why not fetch()) — it is not tied to any locally picked file/folder, and
-        // entries are not clickable. It just tells the user which file (and frame) to
-        // go open via the "파일 선택" picker above; there is no "load on click" here.
+        // entries never load a file on click. Clicking a .guide-frame row (see
+        // jumpToGalleryFrame) only jumps to that frame's thumbnail if the file it
+        // belongs to is already the one loaded and that frame is currently rendered
+        // — otherwise it just tells the user which file to go open via the "파일
+        // 선택" picker above.
         //
         // Each catalog entry is:
         //   { name: "<friendly file name>", items: { "<frameIndex>": "<name>" },
@@ -743,10 +759,32 @@
                 const frameRow = document.createElement('div');
                 frameRow.className = 'guide-frame';
                 frameRow.textContent = `- ${frameIndex}: ${label}`;
+                frameRow.title = '불러온 파일에 있으면 해당 이미지로 스크롤합니다';
+                frameRow.addEventListener('click', () => jumpToGalleryFrame(row.filename, frameIndex));
                 wrapper.appendChild(frameRow);
             }
 
             return wrapper;
+        }
+
+        // Scrolls to and briefly flashes the gallery thumbnail for `filename`'s
+        // `frameIndex`, but only if that file is the one currently loaded and that
+        // frame is actually rendered (not hidden by skip-blank). This is the guide's
+        // one interactive behavior — it still never loads a file on its own, it only
+        // jumps to a frame that's already parsed.
+        function jumpToGalleryFrame(filename, frameIndex) {
+            if (currentFileName !== filename) {
+                showInfo(`"${filename}" 파일을 먼저 불러와야 이 이미지로 이동할 수 있습니다.`);
+                return;
+            }
+            const target = document.querySelector(`.image-item[data-frame-index="${CSS.escape(String(frameIndex))}"]`);
+            if (!target) {
+                showInfo(`${frameIndex}번 이미지는 현재 표시되지 않았습니다 (빈 이미지 건너뛰기 설정을 확인하세요).`);
+                return;
+            }
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.classList.add('jump-flash');
+            setTimeout(() => target.classList.remove('jump-flash'), 1200);
         }
 
         treeSearchInput.addEventListener('input', () => {
