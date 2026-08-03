@@ -334,6 +334,10 @@
             border-color: var(--accent);
             box-shadow: 0 0 0 1px var(--accent), 0 4px 14px -4px var(--accent-dim);
         }
+        .image-item.search-match {
+            outline: 3px solid var(--accent);
+            outline-offset: 2px;
+        }
         .image-item input[type="checkbox"] {
             position: absolute;
             top: 8px;
@@ -745,7 +749,10 @@
             return wrapper;
         }
 
-        treeSearchInput.addEventListener('input', () => renderLabelGuide(treeSearchInput.value));
+        treeSearchInput.addEventListener('input', () => {
+            renderLabelGuide(treeSearchInput.value);
+            updateGallerySearchHighlight(treeSearchInput.value);
+        });
         renderLabelGuide(''); // populate the guide with the full catalog on load
 
         // 거상(Gersang) sprite container family. Both formats share a 16-byte header
@@ -946,6 +953,8 @@
                     statusExtra = ' / 애니메이션으로 표시할 프레임이 없습니다';
                 }
 
+                updateGallerySearchHighlight(treeSearchInput.value);
+
                 exportSelectedButton.disabled = renderedCount === 0;
                 exportAllButton.disabled = renderedCount === 0;
                 selectAllToggleButton.disabled = renderedCount === 0;
@@ -1033,9 +1042,22 @@
             return entry && entry.items ? entry.items[String(frameIndex)] : undefined;
         }
 
+        // Live-updates .search-match on already-rendered thumbnails as the sidebar
+        // search box is typed into, so a currently-loaded file's matching frames
+        // highlight immediately without requiring a re-load.
+        function updateGallerySearchHighlight(query) {
+            const q = query.trim().toLowerCase();
+            document.querySelectorAll('.image-item').forEach(el => {
+                const itemName = q ? getCatalogItemName(el.dataset.frameIndex) : undefined;
+                const matches = !!itemName && itemName.toLowerCase().includes(q);
+                el.classList.toggle('search-match', matches);
+            });
+        }
+
         function addImageToContainer(index, imageData, itemIndex) {
             const div = document.createElement('div');
             div.className = 'image-item';
+            div.dataset.frameIndex = index;
             const itemName = getCatalogItemName(index);
             div.innerHTML = `
                 <input type="checkbox" id="imageCheckbox${index}">
