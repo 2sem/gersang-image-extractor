@@ -645,3 +645,67 @@ GERSANG_LABELS["wetc_i.AGF"] = {
 };
 GERSANG_LABELS["wetc_i.AGF"].folder = "Textures/Items";
 
+// ---- indexes/UI/Portraits/PORTRAIT_INVEN.js ----
+GERSANG_LABELS["PORTRAIT_INVEN.AGF"] = {
+    name: "큰 초상화1",
+    items: {
+
+    }
+};
+GERSANG_LABELS["PORTRAIT_INVEN.AGF"].folder = "UI/Portraits";
+
+// ---- indexes/UI/Portraits/PORTRAIT_INVEN2.js ----
+GERSANG_LABELS["PORTRAIT_INVEN2.AGF"] = {
+    name: "큰 초상화2",
+    items: {
+
+    }
+};
+GERSANG_LABELS["PORTRAIT_INVEN2.AGF"].folder = "UI/Portraits";
+
+// ---- indexes/UI/Portraits/PORTRAIT_INVEN3.js ----
+GERSANG_LABELS["PORTRAIT_INVEN3.AGF"] = {
+    name: "큰 초상화3",
+    items: {
+
+    }
+};
+GERSANG_LABELS["PORTRAIT_INVEN3.AGF"].folder = "UI/Portraits";
+
+// ---- indexes/UI/Portraits/PORTRAIT_INVEN4.js ----
+GERSANG_LABELS["PORTRAIT_INVEN4.AGF"] = {
+    name: "큰 초상화4",
+    items: {
+        "205": "각성 광목천왕",
+        "206": "각성 다문천왕"
+    }
+};
+GERSANG_LABELS["PORTRAIT_INVEN4.AGF"].folder = "UI/Portraits";
+
+// ---- indexes/UI/Portraits/PORTRAIT_INVEN5.js ----
+GERSANG_LABELS["PORTRAIT_INVEN5.AGF"] = {
+    name: "큰 초상화5",
+    items: {
+
+    }
+};
+GERSANG_LABELS["PORTRAIT_INVEN5.AGF"].folder = "UI/Portraits";
+
+// ---- indexes/UI/Portraits/portrait_mercenary_l.js ----
+GERSANG_LABELS["portrait_mercenary_l.AGF"] = {
+    name: "작은(용병칸) 초상화1",
+    items: {
+
+    }
+};
+GERSANG_LABELS["portrait_mercenary_l.AGF"].folder = "UI/Portraits";
+
+// ---- indexes/UI/Portraits/portrait_mercenary_l2.js ----
+GERSANG_LABELS["portrait_mercenary_l2.AGF"] = {
+    name: "작은(용병칸) 초상화2",
+    items: {
+
+    }
+};
+GERSANG_LABELS["portrait_mercenary_l2.AGF"].folder = "UI/Portraits";
+
