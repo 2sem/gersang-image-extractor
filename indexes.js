@@ -623,7 +623,9 @@ GERSANG_LABELS["weapon01_i.AGF"] = {
     name: "천왕무기/인형",
     items: {
         "71": "삼인검",
-        "89": "각성 천왕극"
+        "74": "명왕극",
+        "89": "각성 천왕극",
+        "92": "고급 명왕극"
     }
 };
 GERSANG_LABELS["weapon01_i.AGF"].folder = "Textures/Items";
