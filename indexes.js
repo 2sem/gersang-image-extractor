@@ -45,7 +45,8 @@ GERSANG_LABELS["armor04_i.AGF"] = {
         "73": "천라모자",
         "74": "천라장갑",
         "75": "천라요대",
-        "76": "천라신발"
+        "76": "천라신발",
+        "97": "각성 지국천왕의 신발"
     }
 };
 GERSANG_LABELS["armor04_i.AGF"].folder = "Textures/Items";
@@ -54,7 +55,9 @@ GERSANG_LABELS["armor04_i.AGF"].folder = "Textures/Items";
 GERSANG_LABELS["armor05_i.AGF"] = {
     name: "방어구",
     items: {
-        
+        "12": "각성 광목천왕의 신발",
+        "18": "각성 다문천왕의 신발",
+        "23": "각성 증장천왕의 신발"
     }
 };
 GERSANG_LABELS["armor05_i.AGF"].folder = "Textures/Items";
