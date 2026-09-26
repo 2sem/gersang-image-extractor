@@ -45,7 +45,8 @@ GERSANG_LABELS["armor04_i.AGF"] = {
         "73": "천라모자",
         "74": "천라장갑",
         "75": "천라요대",
-        "76": "천라신발"
+        "76": "천라신발",
+        "93": "각성 지국천왕의 관"
     }
 };
 GERSANG_LABELS["armor04_i.AGF"].folder = "Textures/Items";
@@ -54,7 +55,9 @@ GERSANG_LABELS["armor04_i.AGF"].folder = "Textures/Items";
 GERSANG_LABELS["armor05_i.AGF"] = {
     name: "방어구",
     items: {
-        
+        "8": "각성 광목천왕의 관",
+        "14": "각성 다문천왕의 관",
+        "19": "각성 증장천왕의 관"
     }
 };
 GERSANG_LABELS["armor05_i.AGF"].folder = "Textures/Items";
@@ -245,7 +248,7 @@ GERSANG_LABELS["element12_i.AGF"].folder = "Textures/Items";
 GERSANG_LABELS["element13_i.AGF"] = {
     name: "재료 및 명왕부",
     items: {
-        
+        "47": "부동명왕부"
     }
 };
 GERSANG_LABELS["element13_i.AGF"].folder = "Textures/Items";
@@ -542,6 +545,7 @@ GERSANG_LABELS["ring02_i.AGF"].folder = "Textures/Items";
 GERSANG_LABELS["ring03_i.AGF"] = {
     name: "반지/목걸이/각반",
     items: {
+        "7": "바지라오의 반지",
         "43": "천라반지"
     }
 };
