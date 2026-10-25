@@ -46,6 +46,33 @@ GERSANG_LABELS["eggghost_n.AGF"] = {
 };
 GERSANG_LABELS["eggghost_n.AGF"].folder = "Character";
 
+// ---- indexes/Character/gaemun_a_a.js ----
+GERSANG_LABELS["gaemun_a_a.AGF"] = {
+    name: "개문신장(풍) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["gaemun_a_a.AGF"].folder = "Character";
+
+// ---- indexes/Character/gaemun_a_d_a.js ----
+GERSANG_LABELS["gaemun_a_d_a.AGF"] = {
+    name: "개문신장(암) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["gaemun_a_d_a.AGF"].folder = "Character";
+
+// ---- indexes/Character/gaemun_a_l_a.js ----
+GERSANG_LABELS["gaemun_a_l_a.AGF"] = {
+    name: "개문신장(명) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["gaemun_a_l_a.AGF"].folder = "Character";
+
 // ---- indexes/Character/gakung_n.js ----
 GERSANG_LABELS["gakung_n.AGF"] = {
     name: "각웅(風)",
