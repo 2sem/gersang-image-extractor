@@ -100,6 +100,33 @@ GERSANG_LABELS["ghostintthedark_n.AGF"] = {
 };
 GERSANG_LABELS["ghostintthedark_n.AGF"].folder = "Character";
 
+// ---- indexes/Character/gyeongmun_f_a.js ----
+GERSANG_LABELS["gyeongmun_f_a.AGF"] = {
+    name: "경문신장(불)",
+    items: {
+
+    }
+};
+GERSANG_LABELS["gyeongmun_f_a.AGF"].folder = "Character";
+
+// ---- indexes/Character/gyeongmun_f_d_a.js ----
+GERSANG_LABELS["gyeongmun_f_d_a.AGF"] = {
+    name: "경문신장(암)",
+    items: {
+
+    }
+};
+GERSANG_LABELS["gyeongmun_f_d_a.AGF"].folder = "Character";
+
+// ---- indexes/Character/gyeongmun_f_l_a.js ----
+GERSANG_LABELS["gyeongmun_f_l_a.AGF"] = {
+    name: "경문신장(명)",
+    items: {
+
+    }
+};
+GERSANG_LABELS["gyeongmun_f_l_a.AGF"].folder = "Character";
+
 // ---- indexes/Character/gyoryong_w_n.js ----
 GERSANG_LABELS["gyoryong_w_n.AGF"] = {
     name: "교룡궁(水)",
