@@ -361,6 +361,24 @@ GERSANG_LABELS["simari_n.AGF"] = {
 };
 GERSANG_LABELS["simari_n.AGF"].folder = "Character";
 
+// ---- indexes/Character/sonogong2_n.js ----
+GERSANG_LABELS["sonogong2_n.AGF"] = {
+    name: "제천대성 2단계",
+    items: {
+
+    }
+};
+GERSANG_LABELS["sonogong2_n.AGF"].folder = "Character";
+
+// ---- indexes/Character/sonogong3_n.js ----
+GERSANG_LABELS["sonogong3_n.AGF"] = {
+    name: "제천대성 3단계",
+    items: {
+
+    }
+};
+GERSANG_LABELS["sonogong3_n.AGF"].folder = "Character";
+
 // ---- indexes/Character/toseokdong_n.js ----
 GERSANG_LABELS["toseokdong_n.AGF"] = {
     name: "토석동(地)",
