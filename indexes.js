@@ -95,12 +95,16 @@ GERSANG_LABELS["armor03_i.AGF"].folder = "Textures/Items";
 GERSANG_LABELS["armor04_i.AGF"] = {
     name: "방어구 및 반지",
     items: {
+        "10": "각성 광목천왕의 손목보호대",
+        "16": "각성 다문천왕의 손목보호대",
+        "21": "각성 증장천왕의 손목보호대",
         "72": "천라복장",
         "73": "천라모자",
         "74": "천라장갑",
         "75": "천라요대",
         "76": "천라신발",
-        "93": "각성 지국천왕의 관"
+        "93": "각성 지국천왕의 관",
+        "95": "각성 지국천왕의 손목보호대"
     }
 };
 GERSANG_LABELS["armor04_i.AGF"].folder = "Textures/Items";
