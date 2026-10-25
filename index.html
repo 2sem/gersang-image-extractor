@@ -1129,6 +1129,12 @@
 
         const DOWNLOAD_INTERVAL_MS = 300;
 
+        // "<file name without extension>_<frame index>.png", e.g. armor04_i_95.png
+        function frameImageName(item, fallbackIndex) {
+            const baseName = (currentFileName || 'image').replace(/\.(s32|agf)$/i, '');
+            return `${baseName}_${item.dataset.frameIndex || fallbackIndex}.png`;
+        }
+
         function exportSelectedImages() {
             if (animationModeToggle.checked) {
                 exportAnimationAsGif(true);
@@ -1137,7 +1143,7 @@
             const checkboxes = document.querySelectorAll('.image-item input[type="checkbox"]:checked');
             checkboxes.forEach((checkbox, index) => {
                 const img = checkbox.parentElement.querySelector('img');
-                setTimeout(() => downloadImage(img.src, `image_${index + 1}.png`), index * DOWNLOAD_INTERVAL_MS);
+                setTimeout(() => downloadImage(img.src, frameImageName(checkbox.closest('.image-item'), index + 1)), index * DOWNLOAD_INTERVAL_MS);
             });
         }
 
@@ -1148,7 +1154,7 @@
             }
             const images = document.querySelectorAll('.image-item img');
             images.forEach((img, index) => {
-                setTimeout(() => downloadImage(img.src, `image_${index + 1}.png`), index * DOWNLOAD_INTERVAL_MS);
+                setTimeout(() => downloadImage(img.src, frameImageName(img.closest('.image-item'), index + 1)), index * DOWNLOAD_INTERVAL_MS);
             });
         }
 
