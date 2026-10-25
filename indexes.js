@@ -19,6 +19,15 @@ GERSANG_LABELS["arang_f_n.AGF"] = {
 };
 GERSANG_LABELS["arang_f_n.AGF"].folder = "Character";
 
+// ---- indexes/Character/baekrok_a.js ----
+GERSANG_LABELS["baekrok_a.AGF"] = {
+    name: "백영록(弱) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["baekrok_a.AGF"].folder = "Character";
+
 // ---- indexes/Character/bulsamo_n.js ----
 GERSANG_LABELS["bulsamo_n.AGF"] = {
     name: "불사모(火)",
@@ -36,6 +45,15 @@ GERSANG_LABELS["daeho_t_n.AGF"] = {
     }
 };
 GERSANG_LABELS["daeho_t_n.AGF"].folder = "Character";
+
+// ---- indexes/Character/dumun_w_a.js ----
+GERSANG_LABELS["dumun_w_a.AGF"] = {
+    name: "두문신장(水) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["dumun_w_a.AGF"].folder = "Character";
 
 // ---- indexes/Character/eggghost_n.js ----
 GERSANG_LABELS["eggghost_n.AGF"] = {
@@ -136,6 +154,24 @@ GERSANG_LABELS["gyoryong_w_n.AGF"] = {
 };
 GERSANG_LABELS["gyoryong_w_n.AGF"].folder = "Character";
 
+// ---- indexes/Character/hwangui_t_a.js ----
+GERSANG_LABELS["hwangui_t_a.AGF"] = {
+    name: "황의신장(雷) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["hwangui_t_a.AGF"].folder = "Character";
+
+// ---- indexes/Character/hyumun_t_a.js ----
+GERSANG_LABELS["hyumun_t_a.AGF"] = {
+    name: "휴문신장(雷) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["hyumun_t_a.AGF"].folder = "Character";
+
 // ---- indexes/Character/hyungmaek_a_n.js ----
 GERSANG_LABELS["hyungmaek_a_n.AGF"] = {
     name: "흉맥궁(風)",
@@ -144,6 +180,15 @@ GERSANG_LABELS["hyungmaek_a_n.AGF"] = {
     }
 };
 GERSANG_LABELS["hyungmaek_a_n.AGF"].folder = "Character";
+
+// ---- indexes/Character/jeogui_f_a.js ----
+GERSANG_LABELS["jeogui_f_a.AGF"] = {
+    name: "적의신장(불) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["jeogui_f_a.AGF"].folder = "Character";
 
 // ---- indexes/Character/jeonbi_n.js ----
 GERSANG_LABELS["jeonbi_n.AGF"] = {
@@ -208,6 +253,15 @@ GERSANG_LABELS["nachal_f_n.AGF"] = {
 };
 GERSANG_LABELS["nachal_f_n.AGF"].folder = "Character";
 
+// ---- indexes/Character/namun_f_a.js ----
+GERSANG_LABELS["namun_f_a.AGF"] = {
+    name: "나문신장(불) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["namun_f_a.AGF"].folder = "Character";
+
 // ---- indexes/Character/noeu_t_n.js ----
 GERSANG_LABELS["noeu_t_n.AGF"] = {
     name: "뇌우궁(雷)",
@@ -216,6 +270,78 @@ GERSANG_LABELS["noeu_t_n.AGF"] = {
     }
 };
 GERSANG_LABELS["noeu_t_n.AGF"].folder = "Character";
+
+// ---- indexes/Character/nogui_a_a.js ----
+GERSANG_LABELS["nogui_a_a.AGF"] = {
+    name: "녹의신장(風) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["nogui_a_a.AGF"].folder = "Character";
+
+// ---- indexes/Character/saengmun_a_a.js ----
+GERSANG_LABELS["saengmun_a_a.AGF"] = {
+    name: "생문신장(風) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["saengmun_a_a.AGF"].folder = "Character";
+
+// ---- indexes/Character/samun_t_a.js ----
+GERSANG_LABELS["samun_t_a.AGF"] = {
+    name: "사문신장(雷) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["samun_t_a.AGF"].folder = "Character";
+
+// ---- indexes/Character/samun_t_d_a.js ----
+GERSANG_LABELS["samun_t_d_a.AGF"] = {
+    name: "사문신장(暗) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["samun_t_d_a.AGF"].folder = "Character";
+
+// ---- indexes/Character/samun_t_l_a.js ----
+GERSANG_LABELS["samun_t_l_a.AGF"] = {
+    name: "사문신장(明) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["samun_t_l_a.AGF"].folder = "Character";
+
+// ---- indexes/Character/sangmun_w_a.js ----
+GERSANG_LABELS["sangmun_w_a.AGF"] = {
+    name: "상문신장(수) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["sangmun_w_a.AGF"].folder = "Character";
+
+// ---- indexes/Character/sangmun_w_d_a.js ----
+GERSANG_LABELS["sangmun_w_d_a.AGF"] = {
+    name: "상문신장(암) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["sangmun_w_d_a.AGF"].folder = "Character";
+
+// ---- indexes/Character/sangmun_w_l_a.js ----
+GERSANG_LABELS["sangmun_w_l_a.AGF"] = {
+    name: "상문신장(명) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["sangmun_w_l_a.AGF"].folder = "Character";
 
 // ---- indexes/Character/sasu_t_n.js ----
 GERSANG_LABELS["sasu_t_n.AGF"] = {
@@ -243,6 +369,15 @@ GERSANG_LABELS["toseokdong_n.AGF"] = {
     }
 };
 GERSANG_LABELS["toseokdong_n.AGF"].folder = "Character";
+
+// ---- indexes/Character/unil_a.js ----
+GERSANG_LABELS["unil_a.AGF"] = {
+    name: "운일조(水) 공격",
+    items: {
+
+    }
+};
+GERSANG_LABELS["unil_a.AGF"].folder = "Character";
 
 // ---- indexes/Textures/Items/archeology01_i.js ----
 GERSANG_LABELS["archeology01_i.AGF"] = {
